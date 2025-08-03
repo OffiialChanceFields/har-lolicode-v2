@@ -64,21 +64,26 @@ export class HarProcessor {
 
   static async processHarFile(harContent: string, targetUrl: string): Promise<ProcessingResult> {
     const harData: HarLog = JSON.parse(harContent);
-    let entries = harData.log.entries;
+    
+    let targetHost: string;
+    try {
+      targetHost = new URL(targetUrl).hostname;
+    } catch (error) {
+      throw new Error('Invalid Target URL provided. Please enter a valid URL to proceed.');
+    }
 
     // Pre-filter by targetUrl
-    try {
-      const targetHost = new URL(targetUrl).hostname;
-      entries = entries.filter(entry => {
-        try {
-          const entryHost = new URL(entry.request.url).hostname;
-          return entryHost.endsWith(targetHost);
-        } catch {
-          return false;
-        }
-      });
-    } catch (error) {
-      console.warn('Invalid target URL provided. Skipping host-based filtering.', error);
+    const entries = harData.log.entries.filter(entry => {
+      try {
+        const entryHost = new URL(entry.request.url).hostname;
+        return entryHost.endsWith(targetHost);
+      } catch {
+        return false;
+      }
+    });
+
+    if (entries.length === 0) {
+      throw new Error(`No requests found for the target "${targetHost}". Check the HAR file or Target URL.`);
     }
 
     // Stage 1: Filter static resources
@@ -110,10 +115,7 @@ export class HarProcessor {
         const url = new URL(entry.request.url.toLowerCase());
         const mimeType = entry.response.content.mimeType.toLowerCase();
         
-        // Filter out static file extensions
         const hasStaticExtension = this.STATIC_EXTENSIONS.some(ext => url.pathname.endsWith(ext));
-        
-        // Filter out common static MIME types
         const isStaticMimeType = mimeType.includes('image/') || 
                                 mimeType.includes('font/') ||
                                 mimeType.includes('text/css') ||
@@ -133,27 +135,22 @@ export class HarProcessor {
       let score = 0;
       const entryUrl = new URL(entry.request.url);
 
-      // HTTP Method scoring
       if (entry.request.method === 'POST') score += 10;
       else if (entry.request.method === 'GET') score += 3;
 
-      // URL keyword scoring
       const urlText = entry.request.url.toLowerCase();
       this.LOGIN_KEYWORDS.forEach(keyword => {
         if (urlText.includes(keyword)) score += 8;
       });
 
-      // Boost score if the request domain matches the target domain
       if (entryUrl.hostname.endsWith(targetHost)) {
         score += 5;
       }
 
-      // Response type scoring
       const mimeType = entry.response.content.mimeType;
       if (mimeType.includes('text/html')) score += 3;
       if (mimeType.includes('application/json')) score += 5;
 
-      // Credential data scoring
       if (entry.request.postData) {
         const postData = entry.request.postData.text?.toLowerCase() || '';
         this.CREDENTIAL_FIELDS.forEach(field => {
@@ -161,12 +158,10 @@ export class HarProcessor {
         });
       }
 
-      // XHR/Fetch scoring
       if (entry._resourceType === 'xhr' || entry._resourceType === 'fetch') {
         score += 5;
       }
       
-      // Redirect scoring
       if (entry.response.status >= 300 && entry.response.status < 400) {
         score += 4;
       }
@@ -178,19 +173,16 @@ export class HarProcessor {
   private static identifyCriticalPath(scoredEntries: Array<HarEntry & { score: number }>): HarEntry[] {
     if (scoredEntries.length === 0) return [];
 
-    // Sort by chronological order first
     const chronologicalEntries = [...scoredEntries].sort((a, b) => 
       new Date(a.request.headers.find(h => h.name.toLowerCase() === 'date')?.value || 0).getTime() - 
       new Date(b.request.headers.find(h => h.name.toLowerCase() === 'date')?.value || 0).getTime()
     );
 
-    // Find the highest scoring POST request (likely login submission)
     const loginSubmission = [...chronologicalEntries]
       .sort((a, b) => b.score - a.score)
       .find(entry => entry.request.method === 'POST' && entry.score > 10);
 
     if (!loginSubmission) {
-      // If no clear login POST, return top 3 highest scoring entries in chronological order
       return [...scoredEntries]
         .sort((a, b) => b.score - a.score)
         .slice(0, 3)
@@ -200,7 +192,6 @@ export class HarProcessor {
     const criticalPath: HarEntry[] = [];
     const loginSubmissionIndex = chronologicalEntries.indexOf(loginSubmission);
 
-    // Find the most recent, high-scoring GET request before the login submission
     let loginPage: HarEntry | null = null;
     for (let i = loginSubmissionIndex - 1; i >= 0; i--) {
       const entry = chronologicalEntries[i];
@@ -211,10 +202,8 @@ export class HarProcessor {
     }
     if (loginPage) criticalPath.push(loginPage);
 
-    // Add the login submission
     criticalPath.push(loginSubmission);
 
-    // Add high-scoring requests after login submission
     for (let i = loginSubmissionIndex + 1; i < chronologicalEntries.length; i++) {
       const entry = chronologicalEntries[i];
       if (entry.score > 5) {
@@ -251,7 +240,6 @@ export class HarProcessor {
     const postData = loginSubmission.request.postData.text;
     const responseContent = loginPage.response.content.text;
 
-    // Common token patterns
     const tokenPatterns = [
       { name: 'csrf_token', regex: /name="[_]?csrf_token"[^>]*value="([^"]+)"/ },
       { name: '__RequestVerificationToken', regex: /name="__RequestVerificationToken"[^>]*value="([^"]+)"/ },

@@ -1,75 +1,60 @@
-import { PrismTheme } from 'prism-react-renderer';
+// Converted from: https://github.com/formidablelabs/prism-react-renderer/blob/master/src/themes/nightOwl.js
+// Original: https://github.com/sdras/night-owl-vscode-theme
+// Converted by: LoliScript (https://github.com/LoliScript/LoliScript)
 
-const openBulletTheme: PrismTheme = {
+import { PrismTheme } from "prism-react-renderer";
+
+const theme: PrismTheme = {
   plain: {
-    color: 'hsl(210, 20%, 95%)',
-    backgroundColor: 'hsl(220, 13%, 18%)',
+    color: "hsl(220, 9%, 95%)",
+    backgroundColor: "hsl(220, 13%, 8%)"
   },
-  styles: [
-    {
-      // Comments
-      types: ['comment', 'prolog', 'doctype', 'cdata'],
-      style: {
-        color: 'hsl(220, 10%, 45%)',
-        fontStyle: 'italic',
-      },
-    },
-    {
-      // Keywords like BLOCK, IF, JUMP
-      types: ['keyword', 'tag', 'atrule'],
-      style: {
-        color: 'hsl(200, 80%, 65%)', // A distinct blue
-      },
-    },
-    {
-      // Strings like "hello"
-      types: ['string', 'char', 'inserted'],
-      style: {
-        color: 'hsl(100, 50%, 60%)', // A greenish color
-      },
-    },
-    {
-      // Variables like @myVar or data.RESPONSECODE
-      types: ['variable', 'attr-name', 'constant'],
-      style: {
-        color: 'hsl(35, 95%, 65%)', // An amber/orange color
-      },
-    },
-    {
-      // Functions and class names
-      types: ['function', 'class-name'],
-      style: {
-        color: 'hsl(45, 90%, 65%)', // A gold color
-      },
-    },
-    {
-      // Punctuation and Operators
-      types: ['punctuation', 'operator'],
-      style: {
-        color: 'hsl(210, 20%, 80%)',
-      },
-    },
-    {
-      // Numbers, booleans
-      types: ['boolean', 'number', 'symbol'],
-      style: {
-        color: 'hsl(300, 70%, 70%)', // A purplish color
-      },
-    },
-    {
-      types: ['namespace'],
-      style: {
-        opacity: 0.7,
-      },
-    },
-    {
-      // Important/Regex
-      types: ['regex', 'important'],
-      style: {
-        color: '#fde047', // Yellow 300
-      },
-    },
-  ],
+  styles: [{
+    types: ["comment", "prolog", "doctype", "cdata"],
+    style: {
+      color: "hsl(220, 9%, 65%)"
+    }
+  }, {
+    types: ["namespace"],
+    style: {
+      opacity: 0.7
+    }
+  }, {
+    types: ["string", "attr-value"],
+    style: {
+      color: "hsl(142, 76%, 45%)"
+    }
+  }, {
+    types: ["punctuation", "operator"],
+    style: {
+      color: "hsl(220, 9%, 65%)"
+    }
+  }, {
+    types: ["entity", "url", "symbol", "number", "boolean", "variable", "constant", "property", "regex", "inserted"],
+    style: {
+      color: "hsl(192, 84%, 50%)"
+    }
+  }, {
+    types: ["at-rule", "keyword", "attr-name", "selector"],
+    style: {
+      color: "hsl(271, 91%, 65%)"
+    }
+  }, {
+    types: ["function", "deleted", "tag"],
+    style: {
+      color: "hsl(0, 84%, 60%)"
+    }
+  }, {
+    types: ["function-variable"],
+    style: {
+      color: "hsl(192, 84%, 50%)"
+    }
+  }, {
+    types: ["tag", "selector", "keyword"],
+    style: {
+      color: "hsl(192, 84%, 50%)"
+    }
+  }]
 };
 
-export default openBulletTheme;
+export default theme;

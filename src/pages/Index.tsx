@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Terminal, Zap, Shield, Code } from 'lucide-react';
+import { Terminal, Zap, Shield, Code, UploadCloud } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { HarUpload } from '@/components/HarUpload';
 import { ProcessingPipeline } from '@/components/ProcessingPipeline';
 import { CodeOutput } from '@/components/CodeOutput';
 import { HarProcessor } from '@/services/HarProcessor';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 interface ProcessingState {
   isProcessing: boolean;
@@ -23,9 +25,14 @@ interface ProcessingState {
 
 const PIPELINE_STEPS = [
   {
+    id: 'filtering',
+    title: 'Domain Filtering',
+    description: 'Isolating requests to the target domain'
+  },
+  {
     id: 'ingestion',
-    title: 'Ingestion & Filtering',
-    description: 'Loading HAR file and filtering static resources'
+    title: 'Static Resource Removal',
+    description: 'Filtering out non-essential assets (CSS, images)'
   },
   {
     id: 'analysis',
@@ -41,11 +48,6 @@ const PIPELINE_STEPS = [
     id: 'generation',
     title: 'LoliCode Generation',
     description: 'Converting requests to executable blocks'
-  },
-  {
-    id: 'validation',
-    title: 'Output Validation',
-    description: 'Verifying syntax and sanitizing data'
   }
 ];
 
@@ -58,51 +60,41 @@ const Index = () => {
     filename: ''
   });
   const [targetUrl, setTargetUrl] = useState('');
+  const { toast } = useToast();
 
-  const simulateProcessing = async (filename: string, content: string) => {
-    setProcessing(prev => ({
-      ...prev,
+  const handleProcessing = async (file: File, content: string) => {
+    setProcessing({
       isProcessing: true,
-      filename,
+      filename: file.name,
       currentStep: 0,
       progress: 0,
       result: null
-    }));
-    
-    // Simulate processing stages
-    for (let i = 0; i < PIPELINE_STEPS.length; i++) {
+    });
+
+    const updateProgress = (step: number) => {
       setProcessing(prev => ({
         ...prev,
-        currentStep: i,
-        progress: (i / PIPELINE_STEPS.length) * 80
+        currentStep: step,
+        progress: ((step + 1) / PIPELINE_STEPS.length) * 100
       }));
+    };
 
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
-    }
-
-    // Actually process the HAR file
     try {
+      for (let i = 0; i < PIPELINE_STEPS.length; i++) {
+        updateProgress(i);
+        await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 200));
+      }
       const result = await HarProcessor.processHarFile(content, targetUrl);
-      
-      setProcessing(prev => ({
-        ...prev,
-        progress: 100,
-        result,
-        isProcessing: false
-      }));
-    } catch (error) {
+      setProcessing(prev => ({ ...prev, result, isProcessing: false }));
+    } catch (error: any) {
       console.error('Processing failed:', error);
-      setProcessing(prev => ({
-        ...prev,
-        isProcessing: false,
-        progress: 100
-      }));
+      toast({
+        title: "Analysis Failed",
+        description: error.message || "An unknown error occurred.",
+        variant: "destructive"
+      });
+      setProcessing(prev => ({ ...prev, isProcessing: false, progress: 0, currentStep: 0 }));
     }
-  };
-
-  const handleFileSelect = (file: File, content: string) => {
-    simulateProcessing(file.name, content);
   };
 
   const resetProcessor = () => {
@@ -118,22 +110,16 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b border-border/50 bg-gradient-glow">
-        <div className="container mx-auto px-6 py-8">
+      <header className="border-b border-border/50 bg-gradient-glow sticky top-0 z-10 backdrop-blur-sm">
+        <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center justify-center w-12 h-12 bg-primary/20 rounded-lg border border-primary/20">
-                <Terminal className="h-6 w-6 text-primary" />
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center justify-center w-10 h-10 bg-primary/20 rounded-lg border border-primary/20">
+                <Terminal className="h-5 w-5 text-primary" />
               </div>
-              <div>
-                <h1 className="text-3xl font-bold bg-gradient-cyber bg-clip-text text-transparent">
-                  HAR2LoliCode Automator
-                </h1>
-                <p className="text-muted-foreground mt-1">
-                  Production-grade HAR to OpenBullet 2 configuration converter
-                </p>
-              </div>
+              <h1 className="text-2xl font-bold bg-gradient-cyber bg-clip-text text-transparent">
+                HAR2LoliCode
+              </h1>
             </div>
             
             <div className="flex items-center space-x-6 text-sm text-muted-foreground">
@@ -152,15 +138,13 @@ const Index = () => {
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-      <div className="container mx-auto px-6 py-8">
+      <main className="container mx-auto px-6 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Upload & Pipeline */}
           <div className="lg:col-span-1 space-y-6">
             <HarUpload 
-              onFileSelect={handleFileSelect}
+              onFileSelect={handleProcessing}
               isProcessing={processing.isProcessing}
               targetUrl={targetUrl}
               onTargetUrlChange={setTargetUrl}
@@ -171,10 +155,10 @@ const Index = () => {
                 steps={PIPELINE_STEPS.map((step, index) => ({
                   ...step,
                   status: index < processing.currentStep 
-                    ? 'complete' as const
+                    ? 'complete'
                     : index === processing.currentStep && processing.isProcessing 
-                      ? 'processing' as const
-                      : 'pending' as const
+                      ? 'processing'
+                      : 'pending'
                 }))}
                 currentStep={processing.currentStep}
                 progress={processing.progress}
@@ -182,7 +166,6 @@ const Index = () => {
             )}
           </div>
 
-          {/* Right Column - Results */}
           <div className="lg:col-span-2">
             {processing.result ? (
               <div className="space-y-6">
@@ -193,46 +176,40 @@ const Index = () => {
                 />
                 
                 <div className="flex justify-center">
-                  <button
+                  <Button
                     onClick={resetProcessor}
-                    className="px-6 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg transition-colors"
+                    className="px-6 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg transition-glow"
                   >
                     Process Another File
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
-              <Card className="p-12 text-center bg-gradient-glow border-border/50">
-                <div className="space-y-4">
-                  <div className="flex justify-center">
-                    <Terminal className="h-16 w-16 text-muted-foreground" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-semibold text-foreground">
-                      Ready for HAR Analysis
-                    </h3>
-                    <p className="text-muted-foreground max-w-md mx-auto">
-                      Upload a HAR file to begin automated conversion to OpenBullet 2 LoliCode. 
-                      The tool will analyze request patterns, detect dynamic tokens, and generate production-ready configurations.
-                    </p>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 mt-8 max-w-md mx-auto text-sm">
-                    <div className="bg-muted/20 rounded-lg p-3">
-                      <div className="font-medium text-primary">Advanced Detection</div>
-                      <div className="text-muted-foreground">CSRF tokens, multi-step flows</div>
-                    </div>
-                    <div className="bg-muted/20 rounded-lg p-3">
-                      <div className="font-medium text-secondary">Security First</div>
-                      <div className="text-muted-foreground">Local processing, no uploads</div>
-                    </div>
-                  </div>
+              <Card className="p-12 text-center bg-gradient-glow border-border/50 flex flex-col items-center justify-center h-full shadow-elevation">
+                <div className="animate-pulse-glow mb-6">
+                  <UploadCloud className="h-20 w-20 text-primary" />
                 </div>
+                <h3 className="text-2xl font-bold text-foreground mb-2">
+                  Ready for Analysis
+                </h3>
+                <p className="text-muted-foreground max-w-md mx-auto mb-8">
+                  Upload a HAR file and provide a target URL to begin the automated conversion to OpenBullet 2 LoliCode.
+                </p>
+                <div className="flex gap-4 text-sm">
+                    <div className="bg-muted/20 rounded-lg p-3 border border-border/50">
+                      <div className="font-medium text-primary">Advanced Detection</div>
+                      <div className="text-muted-foreground">CSRF, Dynamic Tokens</div>
+                    </div>
+                    <div className="bg-muted/20 rounded-lg p-3 border border-border/50">
+                      <div className="font-medium text-secondary">Secure by Design</div>
+                      <div className="text-muted-foreground">100% Local Processing</div>
+                    </div>
+                  </div>
               </Card>
             )}
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
