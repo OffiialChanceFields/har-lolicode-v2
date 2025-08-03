@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { Copy, Download, Eye, Code2 } from 'lucide-react';
+import React from 'react';
+import { Copy, Download, Code2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { Highlight } from 'prism-react-renderer';
+import openBulletTheme from '@/lib/openbullet-theme';
 
 interface CodeOutputProps {
   loliCode: string;
@@ -21,7 +23,7 @@ export const CodeOutput: React.FC<CodeOutputProps> = ({
   filename 
 }) => {
   const { toast } = useToast();
-  const [activeView, setActiveView] = useState<'code' | 'analysis'>('code');
+  const [activeView, setActiveView] = React.useState<'code' | 'analysis'>('code');
 
   const copyToClipboard = async () => {
     try {
@@ -89,10 +91,34 @@ export const CodeOutput: React.FC<CodeOutputProps> = ({
           </TabsList>
 
           <TabsContent value="code" className="mt-4">
-            <div className="relative">
-              <pre className="bg-code-bg border border-code-border rounded-lg p-4 text-sm font-mono overflow-x-auto max-h-96 text-foreground">
-                <code>{loliCode}</code>
-              </pre>
+            <div className="relative bg-code-bg border border-code-border rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2 bg-black/20">
+                <span className="text-sm font-medium text-muted-foreground">LoliCode</span>
+              </div>
+              <Highlight
+                theme={openBulletTheme}
+                code={loliCode}
+                language="tsx"
+              >
+                {({ className, style, tokens, getLineProps, getTokenProps }) => (
+                  <pre
+                    className={`${className} p-4 text-sm font-mono overflow-x-auto max-h-96`}
+                    style={style}
+                  >
+                    {tokens.map((line, i) => {
+                      const { key, ...lineProps } = getLineProps({ line, key: i });
+                      return (
+                        <div key={key} {...lineProps}>
+                          {line.map((token, key) => {
+                            const { key: tokenKey, ...tokenProps } = getTokenProps({ token, key });
+                            return <span key={tokenKey} {...tokenProps} />
+                          })}
+                        </div>
+                      );
+                    })}
+                  </pre>
+                )}
+              </Highlight>
             </div>
           </TabsContent>
 

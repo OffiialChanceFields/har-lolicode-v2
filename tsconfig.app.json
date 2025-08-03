@@ -24,7 +24,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "types": ["estree", "json-schema", "node", "react", "react-dom"]
   },
   "include": ["src"]
 }

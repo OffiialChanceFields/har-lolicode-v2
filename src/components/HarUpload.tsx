@@ -1,4 +1,25 @@
-export const HarUpload: React.FC<HarUploadProps> = ({ onFileSelect, isProcessing }) => {
+import { useState, useCallback } from "react";
+import { useDropzone } from "react-dropzone";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Shield, FileText, Upload, Link } from "lucide-react";
+
+interface HarUploadProps {
+  onFileSelect: (file: File, content: string) => void;
+  isProcessing: boolean;
+  targetUrl: string;
+  onTargetUrlChange: (url: string) => void;
+}
+
+export const HarUpload: React.FC<HarUploadProps> = ({ 
+  onFileSelect, 
+  isProcessing,
+  targetUrl,
+  onTargetUrlChange
+}) => {
     const [securityWarningAccepted, setSecurityWarningAccepted] = useState(false);
   
     const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -59,10 +80,32 @@ export const HarUpload: React.FC<HarUploadProps> = ({ onFileSelect, isProcessing
             </AlertDescription>
           </Alert>
         )}
+
+        {/* Target URL Input */}
+        {securityWarningAccepted && (
+          <Card className="p-4">
+            <Label htmlFor="target-url" className="flex items-center gap-2 mb-2 text-sm font-medium">
+              <Link className="h-4 w-4 text-primary" />
+              Target URL
+            </Label>
+            <Input
+              id="target-url"
+              type="url"
+              placeholder="e.g., https://api.example.com"
+              value={targetUrl}
+              onChange={(e) => onTargetUrlChange(e.target.value)}
+              disabled={isProcessing}
+              className="bg-background"
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              Strictly filters for requests to this domain, improving analysis accuracy.
+            </p>
+          </Card>
+        )}
   
         {/* File Upload Area */}
         <Card className={`border-2 border-dashed transition-all duration-300 ${
-          !securityWarningAccepted 
+          !securityWarningAccepted || !targetUrl
             ? 'opacity-50 cursor-not-allowed' 
             : isDragActive 
               ? 'border-primary bg-primary/5 shadow-glow' 

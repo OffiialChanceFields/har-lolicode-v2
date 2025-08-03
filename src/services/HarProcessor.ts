@@ -1,4 +1,5 @@
-request: {
+interface HarEntry {
+  request: {
     method: string;
     url: string;
     headers: Array<{ name: string; value: string }>;
@@ -19,10 +20,20 @@ request: {
   _resourceType?: string;
 }
 
+interface HarPage {
+  startedDateTime: string;
+  id: string;
+  title: string;
+  pageTimings: {
+    onContentLoad: number;
+    onLoad: number;
+  };
+}
+
 interface HarLog {
   log: {
     entries: HarEntry[];
-    pages: any[];
+    pages: HarPage[];
   };
 }
 
@@ -51,15 +62,30 @@ export class HarProcessor {
     'login', 'signin', 'credentials'
   ];
 
-  static async processHarFile(harContent: string): Promise<ProcessingResult> {
+  static async processHarFile(harContent: string, targetUrl: string): Promise<ProcessingResult> {
     const harData: HarLog = JSON.parse(harContent);
-    const entries = harData.log.entries;
+    let entries = harData.log.entries;
+
+    // Pre-filter by targetUrl
+    try {
+      const targetHost = new URL(targetUrl).hostname;
+      entries = entries.filter(entry => {
+        try {
+          const entryHost = new URL(entry.request.url).hostname;
+          return entryHost.endsWith(targetHost);
+        } catch {
+          return false;
+        }
+      });
+    } catch (error) {
+      console.warn('Invalid target URL provided. Skipping host-based filtering.', error);
+    }
 
     // Stage 1: Filter static resources
     const filteredEntries = this.filterStaticResources(entries);
 
     // Stage 2: Score and identify critical path
-    const scoredEntries = this.scoreEntries(filteredEntries);
+    const scoredEntries = this.scoreEntries(filteredEntries, targetUrl);
     const criticalPath = this.identifyCriticalPath(scoredEntries);
 
     // Stage 3: Detect dynamic tokens
@@ -80,35 +106,47 @@ export class HarProcessor {
 
   private static filterStaticResources(entries: HarEntry[]): HarEntry[] {
     return entries.filter(entry => {
-      const url = entry.request.url.toLowerCase();
-      const mimeType = entry.response.content.mimeType.toLowerCase();
-      
-      // Filter out static file extensions
-      const hasStaticExtension = this.STATIC_EXTENSIONS.some(ext => url.includes(ext));
-      
-      // Filter out common static MIME types
-      const isStaticMimeType = mimeType.includes('image/') || 
-                              mimeType.includes('font/') ||
-                              mimeType.includes('text/css') ||
-                              mimeType.includes('application/javascript');
+      try {
+        const url = new URL(entry.request.url.toLowerCase());
+        const mimeType = entry.response.content.mimeType.toLowerCase();
+        
+        // Filter out static file extensions
+        const hasStaticExtension = this.STATIC_EXTENSIONS.some(ext => url.pathname.endsWith(ext));
+        
+        // Filter out common static MIME types
+        const isStaticMimeType = mimeType.includes('image/') || 
+                                mimeType.includes('font/') ||
+                                mimeType.includes('text/css') ||
+                                mimeType.includes('application/javascript');
 
-      return !hasStaticExtension && !isStaticMimeType;
+        return !hasStaticExtension && !isStaticMimeType;
+      } catch {
+        return false;
+      }
     });
   }
 
-  private static scoreEntries(entries: HarEntry[]): Array<HarEntry & { score: number }> {
+  private static scoreEntries(entries: HarEntry[], targetUrl: string): Array<HarEntry & { score: number }> {
+    const targetHost = new URL(targetUrl).hostname;
+    
     return entries.map(entry => {
       let score = 0;
+      const entryUrl = new URL(entry.request.url);
 
       // HTTP Method scoring
       if (entry.request.method === 'POST') score += 10;
       else if (entry.request.method === 'GET') score += 3;
 
       // URL keyword scoring
-      const url = entry.request.url.toLowerCase();
+      const urlText = entry.request.url.toLowerCase();
       this.LOGIN_KEYWORDS.forEach(keyword => {
-        if (url.includes(keyword)) score += 8;
+        if (urlText.includes(keyword)) score += 8;
       });
+
+      // Boost score if the request domain matches the target domain
+      if (entryUrl.hostname.endsWith(targetHost)) {
+        score += 5;
+      }
 
       // Response type scoring
       const mimeType = entry.response.content.mimeType;
@@ -119,7 +157,7 @@ export class HarProcessor {
       if (entry.request.postData) {
         const postData = entry.request.postData.text?.toLowerCase() || '';
         this.CREDENTIAL_FIELDS.forEach(field => {
-          if (postData.includes(field)) score += 15;
+          if (postData.includes(`"${field}"`)) score += 15;
         });
       }
 
@@ -127,51 +165,68 @@ export class HarProcessor {
       if (entry._resourceType === 'xhr' || entry._resourceType === 'fetch') {
         score += 5;
       }
+      
+      // Redirect scoring
+      if (entry.response.status >= 300 && entry.response.status < 400) {
+        score += 4;
+      }
 
       return { ...entry, score };
     });
   }
 
   private static identifyCriticalPath(scoredEntries: Array<HarEntry & { score: number }>): HarEntry[] {
-    // Sort by score descending
-    const sortedEntries = [...scoredEntries].sort((a, b) => b.score - a.score);
-    
-    // Find the highest scoring POST request (likely login submission)
-    const loginSubmission = sortedEntries.find(entry => 
-      entry.request.method === 'POST' && entry.score > 10
+    if (scoredEntries.length === 0) return [];
+
+    // Sort by chronological order first
+    const chronologicalEntries = [...scoredEntries].sort((a, b) => 
+      new Date(a.request.headers.find(h => h.name.toLowerCase() === 'date')?.value || 0).getTime() - 
+      new Date(b.request.headers.find(h => h.name.toLowerCase() === 'date')?.value || 0).getTime()
     );
 
+    // Find the highest scoring POST request (likely login submission)
+    const loginSubmission = [...chronologicalEntries]
+      .sort((a, b) => b.score - a.score)
+      .find(entry => entry.request.method === 'POST' && entry.score > 10);
+
     if (!loginSubmission) {
-      // If no clear login POST, return top 3 entries
-      return sortedEntries.slice(0, 3);
+      // If no clear login POST, return top 3 highest scoring entries in chronological order
+      return [...scoredEntries]
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3)
+        .sort((a, b) => new Date(a.request.headers.find(h => h.name.toLowerCase() === 'date')?.value || 0).getTime() - new Date(b.request.headers.find(h => h.name.toLowerCase() === 'date')?.value || 0).getTime());
     }
 
     const criticalPath: HarEntry[] = [];
-    
-    // Find the GET request before the login submission (likely login page)
-    const loginSubmissionIndex = scoredEntries.indexOf(loginSubmission);
+    const loginSubmissionIndex = chronologicalEntries.indexOf(loginSubmission);
+
+    // Find the most recent, high-scoring GET request before the login submission
+    let loginPage: HarEntry | null = null;
     for (let i = loginSubmissionIndex - 1; i >= 0; i--) {
-      const entry = scoredEntries[i];
-      if (entry.request.method === 'GET' && 
-          entry.response.content.mimeType.includes('text/html')) {
-        criticalPath.push(entry);
+      const entry = chronologicalEntries[i];
+      if (entry.request.method === 'GET' && entry.score > 2) {
+        loginPage = entry;
         break;
       }
     }
+    if (loginPage) criticalPath.push(loginPage);
 
     // Add the login submission
     criticalPath.push(loginSubmission);
 
-    // Add any high-scoring requests after login submission
-    for (let i = loginSubmissionIndex + 1; i < scoredEntries.length; i++) {
-      const entry = scoredEntries[i];
+    // Add high-scoring requests after login submission
+    for (let i = loginSubmissionIndex + 1; i < chronologicalEntries.length; i++) {
+      const entry = chronologicalEntries[i];
       if (entry.score > 5) {
         criticalPath.push(entry);
       }
     }
 
-    return criticalPath.length > 0 ? criticalPath : sortedEntries.slice(0, 3);
+    return criticalPath.length > 0 
+      ? criticalPath 
+      : scoredEntries.sort((a,b) => b.score - a.score).slice(0, 3);
   }
+
 
   private static detectDynamicTokens(criticalPath: HarEntry[]): Array<{
     name: string;
@@ -191,9 +246,9 @@ export class HarProcessor {
     const loginPage = criticalPath[0];
     const loginSubmission = criticalPath[1];
 
-    if (!loginSubmission.request.postData) return tokens;
+    if (!loginSubmission.request.postData?.text) return tokens;
 
-    const postData = loginSubmission.request.postData.text || '';
+    const postData = loginSubmission.request.postData.text;
     const responseContent = loginPage.response.content.text;
 
     // Common token patterns
@@ -201,23 +256,28 @@ export class HarProcessor {
       { name: 'csrf_token', regex: /name="[_]?csrf_token"[^>]*value="([^"]+)"/ },
       { name: '__RequestVerificationToken', regex: /name="__RequestVerificationToken"[^>]*value="([^"]+)"/ },
       { name: 'authenticity_token', regex: /name="authenticity_token"[^>]*value="([^"]+)"/ },
+      { name: 'nonce', regex: /name="nonce"[^>]*value="([^"]+)"/ },
+      { name: 'state', regex: /name="state"[^>]*value="([^"]+)"/ },
       { name: '_token', regex: /name="_token"[^>]*value="([^"]+)"/ }
     ];
 
-    // Parse POST data to find parameter values
-    const postParams = new URLSearchParams(postData);
+    let postParams;
+    try {
+      postParams = JSON.parse(postData);
+    } catch {
+      postParams = Object.fromEntries(new URLSearchParams(postData));
+    }
     
-    for (const [paramName, paramValue] of postParams.entries()) {
-      // Skip obvious credential fields
+    for (const [paramName, paramValue] of Object.entries(postParams)) {
+      if (typeof paramValue !== 'string') continue;
+      
       if (this.CREDENTIAL_FIELDS.some(field => 
         paramName.toLowerCase().includes(field.toLowerCase())
       )) {
         continue;
       }
 
-      // Check if this value exists in the response content
       if (responseContent.includes(paramValue)) {
-        // Try to find a matching pattern
         for (const pattern of tokenPatterns) {
           const match = responseContent.match(pattern.regex);
           if (match && match[1] === paramValue) {
@@ -225,7 +285,7 @@ export class HarProcessor {
               name: paramName,
               value: paramValue,
               sourceResponse: responseContent,
-              regex: pattern.regex.source
+              regex: pattern.regex.source.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
             });
             break;
           }
@@ -243,21 +303,21 @@ export class HarProcessor {
     regex: string;
   }>): string {
     const blocks: string[] = [];
+    const sanitizedTokens = new Set<string>();
 
-    // Add config header
-    blocks.push('# Generated HAR2LoliCode Configuration');
-    blocks.push('# Security Notice: Review and test thoroughly before use');
+    blocks.push('// Generated by HAR2LoliCode Automator');
+    blocks.push('// Review and adapt the configuration before use.');
     blocks.push('');
 
     criticalPath.forEach((entry, index) => {
-      // Generate Request block
-      blocks.push(`BLOCK:Request`);
+      const isFirstRequest = index === 0;
+
+      blocks.push(`BLOCK:Request "${entry.request.method} ${new URL(entry.request.url).pathname}"`);
       blocks.push(`  method = ${entry.request.method}`);
       blocks.push(`  url = "${entry.request.url}"`);
       
-      // Add important headers
       const importantHeaders = entry.request.headers.filter(h => 
-        ['user-agent', 'referer', 'origin', 'content-type'].includes(h.name.toLowerCase()) ||
+        ['user-agent', 'referer', 'origin', 'content-type', 'accept', 'accept-language'].includes(h.name.toLowerCase()) ||
         h.name.toLowerCase().startsWith('x-')
       );
 
@@ -269,20 +329,27 @@ export class HarProcessor {
         blocks.push(`  }`);
       }
 
-      // Add POST data
-      if (entry.request.postData) {
+      if (entry.request.postData?.text) {
         blocks.push(`  contentType = "${entry.request.postData.mimeType}"`);
         
-        let content = entry.request.postData.text || '';
+        let content = entry.request.postData.text;
         
-        // Replace credentials with variables
-        content = content.replace(/([&?](?:username|user|email)=)[^&]+/gi, '$1<USER>');
-        content = content.replace(/([&?](?:password|pass|pwd)=)[^&]+/gi, '$1<PASS>');
-        
-        // Replace dynamic tokens with variables
-        tokens.forEach(token => {
-          content = content.replace(token.value, `@${token.name}`);
-        });
+        try {
+            const postParams = JSON.parse(content);
+            this.CREDENTIAL_FIELDS.forEach(cred => {
+                if (postParams[cred]) postParams[cred] = `<${cred.toUpperCase()}>`;
+            });
+            tokens.forEach(token => {
+                if (postParams[token.name]) postParams[token.name] = `<@${token.name}>`;
+            });
+            content = JSON.stringify(postParams);
+        } catch {
+            content = content.replace(/([&?](?:username|user|email)=)[^&]+/gi, '$1<USER>');
+            content = content.replace(/([&?](?:password|pass|pwd)=)[^&]+/gi, '$1<PASS>');
+            tokens.forEach(token => {
+              content = content.replace(token.value, `<@${token.name}>`);
+            });
+        }
         
         blocks.push(`  content = "${content}"`);
       }
@@ -290,59 +357,44 @@ export class HarProcessor {
       blocks.push(`ENDBLOCK`);
       blocks.push('');
 
-      // Generate Parse blocks for tokens (after first request)
-      if (index === 0 && tokens.length > 0) {
+      if (isFirstRequest && tokens.length > 0) {
         tokens.forEach(token => {
-          blocks.push(`BLOCK:Parse`);
+          if (sanitizedTokens.has(token.name)) return;
+          
+          blocks.push(`BLOCK:Parse "Extract ${token.name}"`);
           blocks.push(`  inputString = data.SOURCE`);
           blocks.push(`  parseType = RegEx`);
           blocks.push(`  regexMatch = "${token.regex}"`);
           blocks.push(`  outputVariable = "@${token.name}"`);
           blocks.push(`ENDBLOCK`);
           blocks.push('');
+          sanitizedTokens.add(token.name);
         });
       }
     });
 
-    // Add KeyCheck block for the final request
     if (criticalPath.length > 0) {
       const finalEntry = criticalPath[criticalPath.length - 1];
-      const responseText = finalEntry.response.content.text.toLowerCase();
-
+      
       blocks.push(`BLOCK:KeyCheck`);
       
-      // Check for success indicators
-      const successKeywords = ['welcome', 'dashboard', 'logout', 'profile', 'account'];
-      const foundSuccessKeyword = successKeywords.find(keyword => 
-        responseText.includes(keyword)
-      );
+      const successKeywords = ['welcome', 'dashboard', 'logout', 'profile', 'account', 'home'];
+      const failureKeywords = ['invalid', 'incorrect', 'error', 'failed', 'denied', 'wrong'];
       
-      if (foundSuccessKeyword) {
-        blocks.push(`  keyChains = {`);
-        blocks.push(`    SUCCESS = (STRINGKEY, "${foundSuccessKeyword}")`);
+      const successKey = successKeywords.find(k => finalEntry.response.content.text.toLowerCase().includes(k));
+      const failureKey = failureKeywords.find(k => finalEntry.response.content.text.toLowerCase().includes(k));
+
+      blocks.push(`  keyChains = {`);
+      if (successKey) {
+        blocks.push(`    SUCCESS = (STRINGKEY, "${successKey}")`);
       }
-
-      // Check for failure indicators
-      const failureKeywords = ['invalid', 'incorrect', 'error', 'failed', 'denied'];
-      const foundFailureKeyword = failureKeywords.find(keyword => 
-        responseText.includes(keyword)
-      );
-
-      if (foundFailureKeyword) {
-        if (!foundSuccessKeyword) blocks.push(`  keyChains = {`);
-        blocks.push(`    FAILURE = (STRINGKEY, "${foundFailureKeyword}")`);
+      if (failureKey) {
+        blocks.push(`    FAILURE = (STRINGKEY, "${failureKey}")`);
       }
-
-      // Check for ban indicators
       if (finalEntry.response.status === 429) {
-        if (!foundSuccessKeyword && !foundFailureKeyword) blocks.push(`  keyChains = {`);
         blocks.push(`    BAN = (INTKEY, "429")`);
       }
-
-      if (foundSuccessKeyword || foundFailureKeyword || finalEntry.response.status === 429) {
-        blocks.push(`  }`);
-      }
-
+      blocks.push(`  }`);
       blocks.push(`ENDBLOCK`);
     }
 

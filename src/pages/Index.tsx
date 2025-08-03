@@ -57,6 +57,7 @@ const Index = () => {
     result: null,
     filename: ''
   });
+  const [targetUrl, setTargetUrl] = useState('');
 
   const simulateProcessing = async (filename: string, content: string) => {
     setProcessing(prev => ({
@@ -82,7 +83,7 @@ const Index = () => {
 
     // Actually process the HAR file
     try {
-      const result = await HarProcessor.processHarFile(content);
+      const result = await HarProcessor.processHarFile(content, targetUrl);
       
       setProcessing(prev => ({
         ...prev,
@@ -112,6 +113,7 @@ const Index = () => {
       result: null,
       filename: ''
     });
+    setTargetUrl('');
   };
 
   return (
@@ -160,6 +162,8 @@ const Index = () => {
             <HarUpload 
               onFileSelect={handleFileSelect}
               isProcessing={processing.isProcessing}
+              targetUrl={targetUrl}
+              onTargetUrlChange={setTargetUrl}
             />
             
             {(processing.isProcessing || processing.result) && (
