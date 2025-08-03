@@ -1,36 +1,66 @@
-# Project Blueprint: HAR2LoliCode Automator
+# Project Blueprint: HAR to LoliCode Converter
 
-## Overview
+## 1. Overview
 
-The HAR2LoliCode Automator is a powerful, production-grade tool designed to streamline the process of converting HAR (HTTP Archive) files into OpenBullet 2 LoliCode configurations. By automating the analysis of network traffic, this tool saves security researchers, developers, and pentesters significant time and effort.
+This project is a web-based utility designed to automate the conversion of HTTP Archive (HAR) files into LoliCode, a scripting language used by OpenBullet 2 for web automation and testing. The primary goal is to streamline the process of creating web automation scripts by analyzing network traffic and generating a functional LoliCode configuration.
 
-The application is built with a focus on security and privacy, processing all data locally in the browser to ensure that sensitive information never leaves the user's machine. The intuitive interface guides the user through the process, from uploading a HAR file to generating a fully functional LoliCode configuration.
+The application is built with React, TypeScript, and Vite, and it leverages modern UI components from Shadcn/UI to provide a clean and intuitive user experience. All processing is done locally in the user's browser, ensuring that sensitive data within the HAR files is never transmitted to a server.
 
-## Key Features
+## 2. Core Features
 
-- **Local Processing:** All HAR file processing is done locally in the browser, ensuring that no sensitive data is transmitted to external servers.
-- **Critical Path Analysis:** The tool uses a sophisticated heuristic scoring system to identify the critical requests in the HAR file, such as login and authentication flows.
-- **Dynamic Token Detection:** The application automatically detects and extracts dynamic tokens, such as CSRF tokens, from the server's responses and injects them into subsequent requests.
-- **LoliCode Generation:** The tool generates clean, well-structured LoliCode that is ready to be used in OpenBullet 2, with placeholders for user credentials.
-- **Target URL Filtering:** The user can specify a target URL to filter out irrelevant requests and improve the accuracy of the analysis.
-- **Real-time Error Handling:** The application provides immediate feedback on the validity of the target URL, preventing analysis with incorrect parameters.
+### 2.1. HAR File Upload and Parsing
+- **File Upload**: Users can upload HAR files (`.har`) using a drag-and-drop interface or a file selector.
+- **Local Parsing**: The application parses the HAR file locally using a streaming parser to handle large files efficiently without consuming excessive memory.
+- **Security Warning**: A prominent warning is displayed to inform users about the sensitive nature of HAR files and to confirm that all processing is done locally.
 
-## Current Implementation
+### 2.2. Context-Aware Analysis Mode Selection
+- **Analysis Modes**: Users can select from a predefined set of analysis modes to tailor the processing logic to their specific needs.
+- **Modes**:
+    - **Initial Page Load**: Focuses on the initial GET requests when a page loads.
+    - **Failed Authentication**: Prioritizes requests that indicate a failed login attempt.
+    - **Successful Authentication**: Focuses on requests that indicate a successful login.
+    - **Comprehensive Flow**: Analyzes all requests to provide a complete picture of the user flow.
+    - **Custom Pattern**: Allows for user-defined filtering and analysis logic (future implementation).
+- **Detailed UI**: The UI provides detailed descriptions, complexity ratings, and recommended use cases for each mode, improving usability.
 
-### Target URL Filtering and Error Handling
+### 2.3. Critical Path Analysis with Contextual Scoring
+- **Contextual Scoring**: The application uses a sophisticated scoring mechanism to analyze HAR entries in the context of the selected analysis mode.
+- **Weighting Matrices**: Each scoring strategy uses a detailed weighting matrix to score HAR entries based on various factors, such as HTTP method, content type, URL semantics, and temporal positioning.
+- **Critical Path Identification**: The top-scoring requests are identified as the "critical path," which represents the most important interactions in the user flow.
 
-To improve the accuracy and robustness of the analysis, the application now requires the user to specify a valid target URL. This ensures that only requests from the specified domain are analyzed, which helps to filter out noise from other domains and third-party services.
+### 2.4. LoliCode Generation
+- **Code Generation**: The application generates LoliCode based on the identified critical path.
+- **Token Detection**: The application automatically detects and extracts dynamic tokens (e.g., CSRF tokens, session IDs) from the requests and responses, and it generates the corresponding `PARSE` blocks in the LoliCode.
+- **Code Output**: The generated LoliCode is displayed in a code editor with syntax highlighting for easy review and editing.
 
-The following changes have been made to implement this feature:
+### 2.5. User Interface
+- **Processing Pipeline**: A visual pipeline displays the progress of the analysis, from streaming the HAR file to generating the LoliCode.
+- **JSON Viewer**: Users can view the contents of the HAR file in a JSON viewer to inspect the raw data.
+- **Info Modal**: An information modal provides details about the project, including its purpose, features, and security considerations.
 
-- **`HarProcessor.ts`:** 
-  - The `processHarFile` method now throws an error if an invalid `targetUrl` is provided, preventing the analysis from running with incorrect parameters.
-  - It also throws an error if no requests are found for the specified target, providing clear feedback to the user.
-- **`HarUpload.tsx`:**
-  - The "Target URL" input field now has real-time validation, with immediate visual feedback for invalid URLs.
-  - The "Start Analysis" button is disabled until both a file is selected and a valid target URL is provided.
-- **`Index.tsx`:**
-  - The application now catches errors from the `HarProcessor` and displays them as toast notifications, providing clear and actionable feedback to the user.
-  - The pipeline step descriptions have been refined to better reflect the new filtering and analysis workflow.
+## 3. Technical Stack
 
-This feature improves the overall quality of the generated LoliCode and makes the tool more efficient, user-friendly, and robust.
+- **Front-End**: React, TypeScript, Vite
+- **UI Components**: Shadcn/UI, Tailwind CSS
+- **State Management**: React Hooks (`useState`, `useCallback`, `useMemo`), Custom Hooks (`useHarAnalysis`)
+- **Routing**: React Router
+- **Drag and Drop**: React Dropzone
+- **Icons**: Lucide React
+
+## 4. Project Structure
+
+The project follows a standard React project structure, with the following key directories:
+
+- `src/components`: Contains reusable UI components.
+- `src/hooks`: Contains custom React hooks.
+- `src/lib`: Contains utility functions and libraries.
+- `src/pages`: Contains the main pages of the application.
+- `src/services`: Contains the core business logic for HAR processing, token detection, and LoliCode generation.
+
+## 5. Future Enhancements
+
+- **Custom Analysis Patterns**: Allow users to define their own analysis patterns using a simple UI.
+- **Advanced Token Detection**: Improve the token detection logic to handle more complex scenarios, such as encrypted or obfuscated tokens.
+- **LoliCode Editor**: Add a full-featured LoliCode editor with syntax highlighting, auto-completion, and error checking.
+- **Live Traffic Capture**: Integrate with browser extensions to capture live network traffic and generate LoliCode in real time.
+- **Collaboration Features**: Allow users to share and collaborate on LoliCode configurations.

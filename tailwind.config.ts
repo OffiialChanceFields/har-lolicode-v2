@@ -68,11 +68,21 @@ const config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "glow": {
+          "0%, 100%": { opacity: "0.75", boxShadow: "0 0 10px 2px hsl(var(--primary))" },
+          "50%": { opacity: "1", boxShadow: "0 0 20px 5px hsl(var(--primary))" },
+        }
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "glow": "glow 4s ease-in-out infinite",
       },
+      boxShadow: {
+        'glow-sm': '0 0 4px 1px hsl(var(--primary) / 0.5)',
+        'glow-md': '0 0 10px 2px hsl(var(--primary) / 0.5)',
+        'glow-lg': '0 0 20px 5px hsl(var(--primary) / 0.5)',
+      }
     },
   },
   plugins: [tailwindcssAnimate],

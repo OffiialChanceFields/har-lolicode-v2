@@ -1,5 +1,5 @@
 import React from 'react';
-import { Copy, Download, Code2, Check } from 'lucide-react';
+import { Copy, Download, Code2, Check, Zap, FileText, Share2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -34,11 +34,11 @@ export const CodeOutput: React.FC<CodeOutputProps> = ({
         title: "Copied to clipboard",
         description: "LoliCode has been copied to your clipboard",
       });
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 2500);
     } catch (error) {
       toast({
         title: "Copy failed",
-        description: "Unable to copy to clipboard",
+        description: "Unable to copy to clipboard. Please try again.",
         variant: "destructive"
       });
     }
@@ -49,7 +49,7 @@ export const CodeOutput: React.FC<CodeOutputProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${filename.replace('.har', '')}.loli`;
+    a.download = `${filename.replace(/\.har$/, '')}.loli`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -70,9 +70,9 @@ export const CodeOutput: React.FC<CodeOutputProps> = ({
               variant="outline" 
               size="sm" 
               onClick={copyToClipboard}
-              className="border-primary/20 hover:bg-primary/10 hover:border-primary transition-glow"
+              className={`border-primary/20 hover:bg-primary/10 hover:border-primary transition-all duration-300 ${copied ? 'bg-success/20 border-success' : ''}`}
             >
-              {copied ? <Check className="h-4 w-4 mr-2 text-success" /> : <Copy className="h-4 w-4 mr-2" />}
+              {copied ? <Check className="h-4 w-4 mr-2 text-success animate-pulse" /> : <Copy className="h-4 w-4 mr-2" />}
               {copied ? 'Copied!' : 'Copy'}
             </Button>
             <Button 
@@ -126,15 +126,18 @@ export const CodeOutput: React.FC<CodeOutputProps> = ({
           <TabsContent value="analysis" className="mt-4">
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
-                <div className="bg-muted/20 rounded-lg p-4 text-center border border-border/50 transition-glow">
+                <div className="bg-muted/20 rounded-lg p-4 text-center border border-border/50 transition-glow flex flex-col items-center justify-center">
+                  <FileText className="h-8 w-8 text-primary mb-2" />
                   <div className="text-3xl font-bold text-primary">{analysis.requestsFound}</div>
                   <div className="text-sm text-muted-foreground mt-1">Requests Analyzed</div>
                 </div>
-                <div className="bg-muted/20 rounded-lg p-4 text-center border border-border/50 transition-glow">
+                <div className="bg-muted/20 rounded-lg p-4 text-center border border-border/50 transition-glow flex flex-col items-center justify-center">
+                  <Zap className="h-8 w-8 text-secondary mb-2" />
                   <div className="text-3xl font-bold text-secondary">{analysis.tokensDetected}</div>
                   <div className="text-sm text-muted-foreground mt-1">Dynamic Tokens</div>
                 </div>
-                <div className="bg-muted/20 rounded-lg p-4 text-center border border-border/50 transition-glow">
+                <div className="bg-muted/20 rounded-lg p-4 text-center border border-border/50 transition-glow flex flex-col items-center justify-center">
+                   <Share2 className="h-8 w-8 text-success mb-2" />
                   <div className="text-3xl font-bold text-success">{analysis.criticalPath.length}</div>
                   <div className="text-sm text-muted-foreground mt-1">Critical Steps</div>
                 </div>

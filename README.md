@@ -1,61 +1,30 @@
-# Welcome to your Lovable project
+# HAR to LoliCode Converter
 
-## Project info
+This is a web-based tool that converts HAR (HTTP Archive) files into LoliCode, a scripting language used by OpenBullet 2 for web automation and testing. The tool is designed to be fast, efficient, and secure, with all processing done locally in the browser.
 
-**URL**: https://lovable.dev/projects/3d29e6dc-b477-4396-ac2b-0a70e7bf8b27
+## Features
 
-## How can I edit this code?
+-   **Local Processing:** All HAR file processing is done locally in the browser. No data is ever sent to a server.
+-   **Streaming HAR Parser:** The tool uses a streaming parser to handle large HAR files without crashing the browser.
+-   **Critical Path Detection:** The tool automatically detects the critical path in the HAR file, such as the login flow, and generates LoliCode for it.
+-   **Dynamic Token Detection:** The tool can detect and handle dynamic tokens, such as CSRF tokens, to ensure that the generated LoliCode is as accurate as possible.
+-   **LoliCode Generation:** The tool generates LoliCode that is compatible with OpenBullet 2.
+-   **Modern UI:** The tool has a modern, responsive user interface that is easy to use.
 
-There are several ways of editing your application.
+## How to Use
 
-**Use Lovable**
+1.  **Export a HAR file from your browser.**
+2.  **Go to the HAR to LoliCode Converter.**
+3.  **Drag and drop the HAR file onto the page, or click to select a file.**
+4.  **Enter the target URL.**
+5.  **The tool will automatically generate the LoliCode for you.**
+6.  **Copy the LoliCode to your clipboard or download it as a file.**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/3d29e6dc-b477-4396-ac2b-0a70e7bf8b27) and start prompting.
+## Technologies Used
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+-   **React:** A JavaScript library for building user interfaces.
+-   **Vite:** A fast build tool for modern web projects.
+-   **TypeScript:** A typed superset of JavaScript that compiles to plain JavaScript.
+-   **Tailwind CSS:** A utility-first CSS framework for rapidly building custom designs.
+-   **Prism:** A lightweight, extensible syntax highlighter.
+-   **LoliCode:** A scripting language used by OpenBullet 2.
