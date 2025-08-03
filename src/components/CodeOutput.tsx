@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Highlight } from 'prism-react-renderer';
 import openBulletTheme from '@/lib/openbullet-theme';
-import JsonViewer from '@textea/json-viewer';
 
 interface CodeOutputProps {
   loliCode: string;
@@ -167,7 +166,11 @@ export const CodeOutput: React.FC<CodeOutputProps> = ({
                         {analysis.matchedPatterns.map((pattern, index) => (
                             <div key={index} className="bg-code-bg/50 p-3 rounded-lg border border-code-border">
                                 <p className="font-semibold text-secondary mb-2 capitalize">{pattern.name.replace(/_/g, ' ')}</p>
-                                <JsonViewer value={pattern} theme={openBulletTheme as any} />
+                                <pre className="p-2 bg-gray-900 text-white rounded-md overflow-x-auto">
+                                    <code>
+                                        {JSON.stringify(pattern, null, 2)}
+                                    </code>
+                                </pre>
                             </div>
                         ))}
                     </div>

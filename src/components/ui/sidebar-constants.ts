@@ -1,6 +1,34 @@
-export const SIDEBAR_COOKIE_NAME = "sidebar:state"
-export const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-export const SIDEBAR_WIDTH = "16rem"
-export const SIDEBAR_WIDTH_MOBILE = "18rem"
-export const SIDEBAR_WIDTH_ICON = "3rem"
-export const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+import {
+  GitBranchIcon,
+  HomeIcon,
+  LifeBuoyIcon,
+  SettingsIcon,
+  Share2Icon,
+  SquareTerminalIcon,
+  TriangleIcon,
+} from "lucide-react"
+import { NavLink } from "./sidebar-types"
+
+export const NAV_LINKS: NavLink[] = [
+  { href: "/", label: "Home", icon: HomeIcon },
+  {
+    label: "Workspace",
+    icon: TriangleIcon,
+    subLinks: [
+      { href: "/settings", label: "Settings", icon: SettingsIcon },
+      {
+        href: "/getting-started",
+        label: "Getting Started",
+        icon: LifeBuoyIcon,
+      },
+    ],
+  },
+  {
+    label: "Development",
+    icon: GitBranchIcon,
+    subLinks: [
+      { href: "/cli", label: "CLI", icon: SquareTerminalIcon },
+      { href: "/api-reference", label: "API Reference", icon: LifeBuoyIcon },
+    ],
+  },
+]

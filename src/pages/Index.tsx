@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { InfoModal } from '@/components/InfoModal';
 import { Link } from 'react-router-dom';
-import { AnalysisMode } from '@/services/AnalysisMode';
+import { AnalysisMode, AnalysisModeRegistry } from '@/services/AnalysisMode';
+import { AnalysisModeSelector } from '@/components/AnalysisModeSelector';
 
 interface ProcessingState {
   isProcessing: boolean;
@@ -44,6 +45,7 @@ const Index = () => {
     result: null,
     filename: ''
   });
+  const [selectedMode, setSelectedMode] = useState<AnalysisMode.Predefined>(AnalysisMode.Predefined.AUTOMATIC);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { toast } = useToast();
 
@@ -56,73 +58,7 @@ const Index = () => {
     };
 
     try {
-        const config: AnalysisMode.Configuration = {
-            mode: AnalysisMode.Predefined.AUTOMATIC,
-            filtering: {
-                endpointPatterns: {
-                    include: [],
-                    exclude: [/google-analytics.com/, /_next\/static/, /\.css$/, /\.js$/, /\.svg$/, /\.png$/, /\.jpg$/, /\.woff2$/],
-                    priorityPatterns: [{ pattern: /api/, weight: 20 }]
-                },
-                resourceTypeWeights: new Map([
-                    [AnalysisMode.ResourceType.API_ENDPOINT, 30],
-                    [AnalysisMode.ResourceType.FORM_SUBMISSION, 40],
-                    [AnalysisMode.ResourceType.STATIC_ASSET, -50]
-                ]),
-                contextualRules: [
-                    {
-                        name: 'post_authentication_requests',
-                        condition: (entry, ctx) => {
-                          const authCompleted = ctx.previousRequests.some(r => 
-                            r.request.url.includes('/login') && r.response.status === 200
-                          );
-                          return authCompleted && new Date(entry.startedDateTime).getTime() > (ctx.sessionState.authTimestamp || 0);
-                        },
-                        weight: 0.8
-                      },
-                      {
-                        name: 'form_submission_sequence',
-                        condition: (entry, ctx) => {
-                          const hasFormView = ctx.previousRequests.some(r => 
-                            r.response.content.mimeType?.includes('text/html') &&
-                            r.response.content.text?.includes('<form')
-                          );
-                          return hasFormView && entry.request.method === 'POST';
-                        },
-                        weight: 0.9
-                      }
-                ],
-                behavioralPatterns: [
-                    {
-                        name: 'oauth_flow',
-                        significance: 0.95,
-                        pattern: [
-                          { urlPattern: /\/authorize/, methodPattern: ['GET'] },
-                          { urlPattern: /\/callback/, statusPattern: [302, 303] },
-                          { urlPattern: /\/token/, methodPattern: ['POST'] }
-                        ],
-                        extract: (matches) => ({
-                          authorizationEndpoint: matches[0]?.request.url,
-                          callbackEndpoint: matches[1]?.request.url,
-                          tokenEndpoint: matches[2]?.request.url,
-                        })
-                      }
-                ],
-                scoreThresholds: {
-                    minimum: 20,
-                    optimal: 70,
-                    includeThreshold: 25
-                }
-            },
-            tokenDetection: {
-                scope: AnalysisMode.TokenDetectionScope.COMPREHENSIVE_SCAN
-            },
-            codeGeneration: {
-                template: AnalysisMode.CodeTemplateType.GENERIC_TEMPLATE,
-                includeComments: true
-            }
-        };
-
+      const config = AnalysisModeRegistry.getConfiguration(selectedMode);
       const result = await AsyncHarProcessor.processHarFileStreaming(content, config, progressCallback);
       setProcessing(prev => ({ ...prev, result, isProcessing: false, progress: 100, currentStep: PIPELINE_STEPS.length }));
     } catch (error: unknown) {
@@ -162,6 +98,7 @@ const Index = () => {
       <main className="container mx-auto px-6 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 space-y-6">
+            <AnalysisModeSelector selectedMode={selectedMode} onModeChange={setSelectedMode} />
             <HarUpload onFileSelect={handleProcessing} isProcessing={processing.isProcessing} />
             {(processing.isProcessing || processing.result) && (
               <Card className="bg-gradient-glow border-border/50 p-6 shadow-elevation">

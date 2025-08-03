@@ -1,6 +1,5 @@
 import React from 'react';
 import { Modal } from './ui/modal'; // Assuming you have a Modal component
-import { JsonViewer } from '@textea/json-viewer';
 
 interface JsonViewerModalProps {
   isOpen: boolean;
@@ -14,14 +13,12 @@ export const JsonViewerModal: React.FC<JsonViewerModalProps> = ({ isOpen, onClos
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
-        <div className="max-h-[70vh] overflow-y-auto">
-            <JsonViewer
-                value={json}
-                theme="dark"
-                rootName={false}
-                displayDataTypes={false}
-                displayObjectSize={false}
-            />
+        <div className="max-h-[70vh] overflow-y-auto bg-gray-900 text-white p-4 rounded-md">
+            <pre>
+                <code>
+                    {JSON.stringify(json, null, 2)}
+                </code>
+            </pre>
         </div>
     </Modal>
   );
