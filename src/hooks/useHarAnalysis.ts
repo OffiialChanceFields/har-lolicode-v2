@@ -1,43 +1,59 @@
-// src/hooks/useHarAnalysis.ts
-import { useState, useCallback } from 'react';
-import { AnalysisMode, AnalysisModeRegistry, AnalysisModeConfiguration } from '../services/AnalysisMode';
 
-interface UseHarAnalysisReturn {
-  analysisMode: AnalysisMode;
-  setAnalysisMode: (mode: AnalysisMode) => void;
-  getConfiguration: () => AnalysisModeConfiguration;
-  isLoading: boolean;
-  error: Error | null;
+import { useState, useCallback } from 'react';
+import { AnalysisMode } from '../services/AnalysisMode';
+import { AsyncHarProcessor } from '../services/AsyncHarProcessor';
+
+interface HarAnalysisResult {
+    loliCode: string;
+    analysis: {
+        requestsFound: number;
+        tokensDetected: number;
+        criticalPath: string[];
+    };
 }
 
-export const useHarAnalysis = (initialMode: AnalysisMode = AnalysisMode.INITIAL_PAGE_LOAD): UseHarAnalysisReturn => {
-  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(initialMode);
+interface UseHarAnalysisReturn {
+  analyzeHar: (harContent: string, config: AnalysisMode.Configuration) => Promise<HarAnalysisResult | undefined>;
+  isLoading: boolean;
+  error: Error | null;
+  progress: {
+      value: number;
+      stage: string;
+  };
+}
+
+export const useHarAnalysis = (): UseHarAnalysisReturn => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
+  const [progress, setProgress] = useState({ value: 0, stage: '' });
 
-  const getConfiguration = useCallback(() => {
+  const analyzeHar = useCallback(async (harContent: string, config: AnalysisMode.Configuration) => {
     setIsLoading(true);
     setError(null);
+    setProgress({ value: 0, stage: 'starting' });
+
     try {
-      const config = AnalysisModeRegistry.getConfiguration(analysisMode);
+      const result = await AsyncHarProcessor.processHarFileStreaming(
+        harContent,
+        config,
+        (value, stage) => setProgress({ value, stage })
+      );
       setIsLoading(false);
-      return config;
+      return result;
     } catch (e: unknown) {
       if (e instanceof Error) {
         setError(e);
       } else {
-        setError(new Error('An unknown error occurred'));
+        setError(new Error('An unknown error occurred during HAR analysis.'));
       }
       setIsLoading(false);
-      throw e;
     }
-  }, [analysisMode]);
+  }, []);
 
   return {
-    analysisMode,
-    setAnalysisMode,
-    getConfiguration,
+    analyzeHar,
     isLoading,
     error,
+    progress
   };
 };

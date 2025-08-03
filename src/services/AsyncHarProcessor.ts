@@ -1,8 +1,9 @@
+
 // src/services/AsyncHarProcessor.ts
 import { StreamingHarParser } from './StreamingHarParser';
 import { ProductionTokenDetector, HarEntry, DetectedToken } from './TokenDetector';
-import { AnalysisModeConfiguration, AnalysisMode, ValidationRuleSet, DomainStrictnessLevel } from './AnalysisMode';
-import { ScoringStrategyFactory, ScoredEntry, AnalysisContext } from './scoring';
+import { AnalysisMode } from './AnalysisMode';
+import { EndpointScoringService, ScoredEntry, AnalysisContext } from './scoring';
 import { ContextualCodeGenerator } from './codeGenerator';
 
 interface ProcessingResult {
@@ -11,6 +12,7 @@ interface ProcessingResult {
     requestsFound: number;
     tokensDetected: number;
     criticalPath: string[];
+    matchedPatterns: any[];
   };
 }
 
@@ -45,11 +47,52 @@ class MemoryOptimizedProcessor {
   }
 }
 
+class BehavioralPatternMatcher {
+    static matchPatterns(entries: HarEntry[], patterns: AnalysisMode.BehavioralPattern[]): any[] {
+        const matchedData: any[] = [];
+        for (const behavioralPattern of patterns) {
+            for(let i=0; i< entries.length; i++) {
+                let localMatch = true;
+                const matchedEntries: HarEntry[] = [];
+                for(let j=0; j<behavioralPattern.pattern.length; j++) {
+                    const entryIndex = i+j;
+                    if(entryIndex >= entries.length) {
+                        localMatch = false;
+                        break;
+                    }
+                    
+                    const entry = entries[entryIndex];
+                    const pattern = behavioralPattern.pattern[j];
+                    
+                    if(pattern.urlPattern && !pattern.urlPattern.test(entry.request.url)) {
+                        localMatch = false;
+                        break;
+                    }
+                    if(pattern.methodPattern && !pattern.methodPattern.includes(entry.request.method)) {
+                        localMatch = false;
+                        break;
+                    }
+                    if(pattern.statusPattern && !pattern.statusPattern.includes(entry.response.status)) {
+                        localMatch = false;
+                        break;
+                    }
+                    matchedEntries.push(entry);
+
+                }
+                if(localMatch) {
+                    matchedData.push(behavioralPattern.extract(matchedEntries));
+                    i += behavioralPattern.pattern.length - 1;
+                }
+            }
+        }
+        return matchedData;
+    }
+}
+
 export class AsyncHarProcessor {
     static async processHarFileStreaming(
         harContent: string,
-        targetUrl: string,
-        config: AnalysisModeConfiguration,
+        config: AnalysisMode.Configuration,
         progressCallback?: (progress: number, stage: string) => void
     ): Promise<ProcessingResult> {
         this.validateHarContent(harContent);
@@ -69,30 +112,32 @@ export class AsyncHarProcessor {
             throw new Error(`No network requests found in the HAR file. Please ensure the file is valid and contains captured traffic.`);
         }
 
-        // 1. Contextual Filtering
-        progressCallback?.(0, 'filtering');
-        let filteredEntries = this.applyContextualFiltering(allEntries, targetUrl, config);
-        filteredEntries = this.applyIntelligentFiltering(filteredEntries, targetUrl);
-        progressCallback?.(100, 'filtering');
-
-        if (filteredEntries.length === 0) {
-            throw new Error(`No relevant requests found for mode "${config.mode}" and target "${targetUrl}". Try a different analysis mode or verify the target URL.`);
-        }
-
-        // 2. Contextual Scoring
+        // 1. Contextual Scoring & Filtering
         progressCallback?.(0, 'scoring');
-        const scoringStrategy = ScoringStrategyFactory.getStrategy(config.mode);
-        const scoredEntries: ScoredEntry[] = [];
-        const analysisContext: Omit<AnalysisContext, 'currentIndex'> = { allEntries: filteredEntries, targetUrl };
+        const scoringService = new EndpointScoringService();
+        const analysisContext: Omit<AnalysisContext, 'currentIndex'> = { allEntries, criteria: config.filtering };
 
-        for (let i = 0; i < filteredEntries.length; i++) {
+        const scoredEntries: ScoredEntry[] = [];
+        for (let i = 0; i < allEntries.length; i++) {
             const entryContext = { ...analysisContext, currentIndex: i };
-            const scoredEntry = await scoringStrategy.computeScore(filteredEntries[i], entryContext);
-            scoredEntries.push(scoredEntry);
-            progressCallback?.( (i / filteredEntries.length) * 100, 'scoring');
+            const scoredEntry = scoringService.scoreEntry(allEntries[i], entryContext);
+            if (scoredEntry.finalScore >= config.filtering.scoreThresholds.includeThreshold) {
+                scoredEntries.push(scoredEntry);
+            }
+            progressCallback?.( (i / allEntries.length) * 100, 'scoring');
         }
         progressCallback?.(100, 'scoring');
-    
+
+        if (scoredEntries.length === 0) {
+            throw new Error(`No relevant requests found after scoring and filtering. Try adjusting the filtering criteria.`);
+        }
+        
+        // 2. Behavioral Pattern Matching
+        progressCallback?.(0, 'behavioral_analysis');
+        const matchedPatterns = BehavioralPatternMatcher.matchPatterns(scoredEntries, config.filtering.behavioralPatterns);
+        progressCallback?.(100, 'behavioral_analysis');
+
+
         // 3. Dependency Analysis
         progressCallback?.(0, 'analysis');
         const { enrichedPath, allTokens } = await this.analyzeDependencies(scoredEntries);
@@ -100,14 +145,14 @@ export class AsyncHarProcessor {
 
         // 4. Contextual Code Generation
         progressCallback?.(0, 'generation');
-        const codeGenerator = new ContextualCodeGenerator(config.mode, config.codeGenerationTemplate);
+        const codeGenerator = new ContextualCodeGenerator(config.mode, config.codeGeneration.template);
         const loliCode = codeGenerator.generateOptimizedLoliCode(
             enrichedPath.map(e => e.entry), 
             allTokens, 
             {
                 includeAnalysisModeMetadata: true,
                 optimizeForContext: true,
-                generateValidationBlocks: config.validationRules !== ValidationRuleSet.MINIMAL_VALIDATION
+                generateValidationBlocks: true
             }
         );
         progressCallback?.(100, 'generation');
@@ -115,9 +160,10 @@ export class AsyncHarProcessor {
         return {
             loliCode,
             analysis: {
-                requestsFound: filteredEntries.length,
+                requestsFound: scoredEntries.length,
                 tokensDetected: allTokens.length,
-                criticalPath: enrichedPath.map(e => `${e.entry.request.method} ${new URL(e.entry.request.url).pathname}`)
+                criticalPath: enrichedPath.map(e => `${e.entry.request.method} ${new URL(e.entry.request.url).pathname}`),
+                matchedPatterns
             }
         };
     }
@@ -136,109 +182,17 @@ export class AsyncHarProcessor {
         }
     }
 
-    private static applyIntelligentFiltering(entries: HarEntry[], targetUrl: string): HarEntry[] {
-        if (!targetUrl) return entries;
-
-        const API_KEYWORDS = ['api', 'v1', 'v2', 'v3', 'rest', 'graphql'];
-        
-        let baseDomain: string;
-        try {
-            baseDomain = new URL(targetUrl).hostname.split('.').slice(-2)[0];
-        } catch (error) {
-            console.warn("Could not extract base domain from target URL. Intelligent filtering may not be effective.");
-            return entries;
-        }
-
-        return entries.filter(entry => {
-            const url = entry.request.url.toLowerCase();
-            const containsBaseDomain = url.includes(baseDomain);
-            const containsApiKeyword = API_KEYWORDS.some(keyword => url.includes(keyword));
-            
-            return containsBaseDomain && containsApiKeyword;
-        });
-    }
-
-    private static applyContextualFiltering(entries: HarEntry[], targetUrl: string, config: AnalysisModeConfiguration): HarEntry[] {
-        const { filteringCriteria, mode } = config;
-        const { domainStrictness = DomainStrictnessLevel.ANY_SUBDOMAIN } = filteringCriteria;
-
-        let targetHost: string | null = null;
-        if (targetUrl) {
-            try {
-                targetHost = new URL(targetUrl).hostname;
-            } catch (error) {
-                console.warn("Invalid target URL provided. Domain filtering will be skipped.");
-            }
-        }
-        
-        const domainFiltered = targetHost
-            ? entries.filter(entry => {
-                try {
-                    const entryHost = new URL(entry.request.url).hostname;
-                    switch (domainStrictness) {
-                        case DomainStrictnessLevel.EXACT_MATCH:
-                            return entryHost === targetHost;
-                        case DomainStrictnessLevel.SAME_SUBDOMAIN:
-                            return entryHost === targetHost || entryHost.endsWith(`.${targetHost}`);
-                        case DomainStrictnessLevel.ANY_SUBDOMAIN: {
-                            const baseDomain = targetHost.split('.').slice(-2).join('.');
-                            const entryBaseDomain = entryHost.split('.').slice(-2).join('.');
-                            return entryBaseDomain === baseDomain;
-                        }
-                        default:
-                            return false;
-                    }
-                } catch { 
-                    return false; 
-                }
-            })
-            : entries;
-
-
-        if (!filteringCriteria) return domainFiltered;
-
-        return domainFiltered.filter(entry => {
-            switch (mode) {
-                case AnalysisMode.INITIAL_PAGE_LOAD:
-                    if (entry.request.method !== 'GET') return false;
-                    if (filteringCriteria.excludeXHRRequests && this.isXHRRequest(entry)) return false;
-                    if (filteringCriteria.prioritizeHTMLResponses) return entry.response.content.mimeType.includes('text/html');
-                    return true;
-        
-                case AnalysisMode.FAILED_AUTHENTICATION:
-                    if (entry.request.method === 'POST' && filteringCriteria.statusCodeFiltering?.includes(entry.response.status)) return true;
-                    return !!(filteringCriteria.includeRedirectChains && entry.response.status >= 300 && entry.response.status < 400);
-
-                case AnalysisMode.SUCCESSFUL_AUTHENTICATION:
-                    if (entry.request.method === 'POST' && filteringCriteria.statusCodeFiltering?.includes(entry.response.status)) return true;
-                    return !!(filteringCriteria.includeSessionEstablishment && entry.response.headers.some(h => h.name.toLowerCase() === 'set-cookie'));
-
-                default: // COMPREHENSIVE_FLOW and CUSTOM_PATTERN default to broader filtering
-                    return !(!filteringCriteria.includeStaticResources && this.isStaticResource(entry));
-            }
-        });
-    }
-  
-    private static isXHRRequest(entry: HarEntry): boolean {
-        return entry.request.headers.some(h => h.name.toLowerCase() === 'x-requested-with' && h.value === 'XMLHttpRequest');
-    }
-
-    private static isStaticResource(entry: HarEntry): boolean {
-        const staticExtensions = ['.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', 'ttf', '.eot'];
-        return staticExtensions.some(ext => new URL(entry.request.url).pathname.endsWith(ext));
-    }
-
     private static async analyzeDependencies(
         scoredEntries: ScoredEntry[]
     ): Promise<{ enrichedPath: EnrichedHarEntry[], allTokens: DetectedToken[] }> {
-        const criticalPath = scoredEntries.sort((a, b) => b.score - a.score).slice(0, 5);
+        const criticalPath = scoredEntries.sort((a, b) => b.finalScore - a.finalScore).slice(0, 10);
         const tokenDetector = new ProductionTokenDetector();
         const allTokens: DetectedToken[] = [];
     
         const enrichedPath: EnrichedHarEntry[] = criticalPath.map(entry => ({
             entry: entry,
             produces: [],
-            score: entry.score,
+            score: entry.finalScore,
         }));
 
         if (enrichedPath.length < 2) {

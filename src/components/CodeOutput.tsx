@@ -1,11 +1,12 @@
 import React from 'react';
-import { Copy, Download, Code2, Check, Zap, FileText, Share2 } from 'lucide-react';
+import { Copy, Download, Code2, Check, Zap, FileText, Share2, Package } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Highlight } from 'prism-react-renderer';
 import openBulletTheme from '@/lib/openbullet-theme';
+import JsonViewer from '@textea/json-viewer';
 
 interface CodeOutputProps {
   loliCode: string;
@@ -13,6 +14,7 @@ interface CodeOutputProps {
     requestsFound: number;
     tokensDetected: number;
     criticalPath: string[];
+    matchedPatterns: any[];
   };
   filename: string;
 }
@@ -154,6 +156,23 @@ export const CodeOutput: React.FC<CodeOutputProps> = ({
                   ))}
                 </ul>
               </div>
+
+              {analysis.matchedPatterns.length > 0 && (
+                <div className="bg-muted/20 rounded-lg p-4 border border-border/50">
+                    <h4 className="font-semibold mb-3 text-foreground flex items-center gap-2">
+                        <Package className="h-5 w-5" />
+                        Detected Behavioral Patterns
+                    </h4>
+                    <div className="space-y-3">
+                        {analysis.matchedPatterns.map((pattern, index) => (
+                            <div key={index} className="bg-code-bg/50 p-3 rounded-lg border border-code-border">
+                                <p className="font-semibold text-secondary mb-2 capitalize">{pattern.name.replace(/_/g, ' ')}</p>
+                                <JsonViewer value={pattern} theme={openBulletTheme as any} />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>

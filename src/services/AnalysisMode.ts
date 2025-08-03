@@ -1,173 +1,159 @@
-// src/services/AnalysisMode.ts
 
-// --- Inferred Type Definitions for Analysis Configuration ---
-// These types are based on the context provided in AnalysisModeConfiguration.
-
-enum ScoringStrategyType {
-  GET_REQUEST_OPTIMIZATION = 'get_request_optimization',
-  FAILED_AUTH_OPTIMIZATION = 'failed_auth_optimization',
-  SUCCESS_FLOW_OPTIMIZATION = 'success_flow_optimization',
-  COMPREHENSIVE_WEIGHTED = 'comprehensive_weighted',
-  CUSTOM_USER_DEFINED = 'custom_user_defined',
-}
-
-export enum DomainStrictnessLevel {
-  EXACT_MATCH = 'exact_match',
-  SAME_SUBDOMAIN = 'same_subdomain',
-  ANY_SUBDOMAIN = 'any_subdomain',
-}
-
-interface FilteringCriteria {
-  includeStaticResources?: boolean;
-  prioritizeHTMLResponses?: boolean;
-  excludeXHRRequests?: boolean;
-  domainStrictness?: DomainStrictnessLevel;
-  prioritizeErrorResponses?: boolean;
-  includeRedirectChains?: boolean;
-  statusCodeFiltering?: number[];
-  prioritizeSuccessResponses?: boolean;
-  includeSessionEstablishment?: boolean;
-  customFilterLogic?: string;
-}
-
-enum TokenDetectionScope {
-  FORM_BASED_ONLY = 'form_based_only',
-  COMPREHENSIVE_SCAN = 'comprehensive_scan',
-  SESSION_MANAGEMENT_FOCUSED = 'session_management_focused',
-  USER_CONFIGURED = 'user_configured',
-}
-
-enum CodeTemplateType {
-  SINGLE_REQUEST_TEMPLATE = 'single_request_template',
-  AUTHENTICATION_FAILURE_TEMPLATE = 'authentication_failure_template',
-  AUTHENTICATION_SUCCESS_TEMPLATE = 'authentication_success_template',
-  MULTI_STEP_FLOW_TEMPLATE = 'multi_step_flow_template',
-  GENERIC_TEMPLATE = 'generic_template',
-}
-
-export enum ValidationRuleSet {
-  MINIMAL_VALIDATION = 'minimal_validation',
-  FAILURE_PATTERN_VALIDATION = 'failure_pattern_validation',
-  SUCCESS_PATTERN_VALIDATION = 'success_pattern_validation',
-  COMPREHENSIVE_VALIDATION = 'comprehensive_validation',
-  USER_DEFINED_RULES = 'user_defined_rules',
-}
-
-enum PerformanceProfile {
-  LOW_LATENCY = 'low_latency',
-  ACCURACY_OPTIMIZED = 'accuracy_optimized',
-  COMPREHENSIVE_ANALYSIS = 'comprehensive_analysis',
-  BALANCED = 'balanced',
-}
-
-class ConfigurationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ConfigurationError';
+export namespace AnalysisMode {
+  export enum Predefined {
+    AUTOMATIC = 'automatic',
+    MANUAL = 'manual',
+    ASSISTED = 'assisted',
   }
-}
 
-// --- Main Analysis Mode Logic ---
+  export enum DomainStrictnessLevel {
+    SAME_ORIGIN_ONLY = 'same_origin_only',
+    SAME_ETLD_PLUS_ONE = 'same_etld_plus_one',
+    ANY = 'any',
+  }
 
-export enum AnalysisMode {
-  INITIAL_PAGE_LOAD = 'initial_page_load',
-  FAILED_AUTHENTICATION = 'failed_authentication',
-  SUCCESSFUL_AUTHENTICATION = 'successful_authentication',
-  COMPREHENSIVE_FLOW = 'comprehensive_flow',
-  CUSTOM_PATTERN = 'custom_pattern'
-}
+  export enum ResourceType {
+    HTML_DOCUMENT = 'html_document',
+    API_ENDPOINT = 'api_endpoint',
+    AUTHENTICATION = 'authentication',
+    FORM_SUBMISSION = 'form_submission',
+    FILE_UPLOAD = 'file_upload',
+    WEBSOCKET = 'websocket',
+    GRAPHQL = 'graphql',
+    REST_API = 'rest_api',
+    STATIC_ASSET = 'static_asset',
+    TRACKING = 'tracking',
+    THIRD_PARTY = 'third_party'
+  }
 
-export interface AnalysisModeConfiguration {
-  mode: AnalysisMode;
-  scoringStrategy: ScoringStrategyType;
-  filteringCriteria: FilteringCriteria;
-  tokenDetectionScope: TokenDetectionScope;
-  codeGenerationTemplate: CodeTemplateType;
-  validationRules: ValidationRuleSet;
-  performanceProfile: PerformanceProfile;
-}
-
-export class AnalysisModeRegistry {
-  private static readonly MODE_CONFIGURATIONS: Map<AnalysisMode, AnalysisModeConfiguration> = new Map([
-    // Existing Configurations
-    [AnalysisMode.INITIAL_PAGE_LOAD, {
-      mode: AnalysisMode.INITIAL_PAGE_LOAD,
-      scoringStrategy: ScoringStrategyType.GET_REQUEST_OPTIMIZATION,
-      filteringCriteria: {
-        includeStaticResources: false,
-        prioritizeHTMLResponses: true,
-        excludeXHRRequests: true,
-        domainStrictness: DomainStrictnessLevel.EXACT_MATCH
-      },
-      tokenDetectionScope: TokenDetectionScope.FORM_BASED_ONLY,
-      codeGenerationTemplate: CodeTemplateType.SINGLE_REQUEST_TEMPLATE,
-      validationRules: ValidationRuleSet.MINIMAL_VALIDATION,
-      performanceProfile: PerformanceProfile.LOW_LATENCY
-    }],
-
-    [AnalysisMode.FAILED_AUTHENTICATION, {
-      mode: AnalysisMode.FAILED_AUTHENTICATION,
-      scoringStrategy: ScoringStrategyType.FAILED_AUTH_OPTIMIZATION,
-      filteringCriteria: {
-        includeStaticResources: false,
-        prioritizeErrorResponses: true,
-        includeRedirectChains: true,
-        statusCodeFiltering: [400, 401, 403, 422, 429]
-      },
-      tokenDetectionScope: TokenDetectionScope.COMPREHENSIVE_SCAN,
-      codeGenerationTemplate: CodeTemplateType.AUTHENTICATION_FAILURE_TEMPLATE,
-      validationRules: ValidationRuleSet.FAILURE_PATTERN_VALIDATION,
-      performanceProfile: PerformanceProfile.ACCURACY_OPTIMIZED
-    }],
-
-    [AnalysisMode.SUCCESSFUL_AUTHENTICATION, {
-      mode: AnalysisMode.SUCCESSFUL_AUTHENTICATION,
-      scoringStrategy: ScoringStrategyType.SUCCESS_FLOW_OPTIMIZATION,
-      filteringCriteria: {
-        includeStaticResources: false,
-        prioritizeSuccessResponses: true,
-        includeSessionEstablishment: true,
-        statusCodeFiltering: [200, 201, 302, 303]
-      },
-      tokenDetectionScope: TokenDetectionScope.SESSION_MANAGEMENT_FOCUSED,
-      codeGenerationTemplate: CodeTemplateType.AUTHENTICATION_SUCCESS_TEMPLATE,
-      validationRules: ValidationRuleSet.SUCCESS_PATTERN_VALIDATION,
-      performanceProfile: PerformanceProfile.COMPREHENSIVE_ANALYSIS
-    }],
-
-    // --- New Configurations ---
-    [AnalysisMode.COMPREHENSIVE_FLOW, {
-        mode: AnalysisMode.COMPREHENSIVE_FLOW,
-        scoringStrategy: ScoringStrategyType.COMPREHENSIVE_WEIGHTED,
-        filteringCriteria: {
-          includeStaticResources: true,
-          includeRedirectChains: true,
-          domainStrictness: DomainStrictnessLevel.SAME_SUBDOMAIN,
-        },
-        tokenDetectionScope: TokenDetectionScope.COMPREHENSIVE_SCAN,
-        codeGenerationTemplate: CodeTemplateType.MULTI_STEP_FLOW_TEMPLATE,
-        validationRules: ValidationRuleSet.COMPREHENSIVE_VALIDATION,
-        performanceProfile: PerformanceProfile.COMPREHENSIVE_ANALIYsis
-      }],
+  export interface EndpointScore {
+    relevanceScore: number;      // 0-100
+    securityScore: number;       // 0-100  
+    businessLogicScore: number;  // 0-100
+    temporalScore: number;       // Based on request timing
+    contextualScore: number;     // Based on surrounding requests
+  }
   
-      [AnalysisMode.CUSTOM_PATTERN, {
-        mode: AnalysisMode.CUSTOM_PATTERN,
-        scoringStrategy: ScoringStrategyType.CUSTOM_USER_DEFINED,
-        filteringCriteria: {
-          customFilterLogic: "/* User-defined filter logic goes here */"
-        },
-        tokenDetectionScope: TokenDetectionScope.USER_CONFIGURED,
-        codeGenerationTemplate: CodeTemplateType.GENERIC_TEMPLATE,
-        validationRules: ValidationRuleSet.USER_DEFINED_RULES,
-        performanceProfile: PerformanceProfile.BALANCED
-      }]
-  ]);
+  // --- New Behavioral Pattern Interfaces ---
+  export interface TimingConstraint {
+    minDelaySeconds?: number;
+    maxDelaySeconds?: number;
+  }
 
-  static getConfiguration(mode: AnalysisMode): AnalysisModeConfiguration {
-    const configuration = this.MODE_CONFIGURATIONS.get(mode);
-    if (!configuration) {
-      throw new ConfigurationError(`Unsupported analysis mode: ${mode}`);
-    }
-    return configuration;
+  export interface RequestPattern {
+    urlPattern?: RegExp;
+    methodPattern?: string[];
+    statusPattern?: number[];
+    headerPattern?: Record<string, RegExp>;
+    bodyPattern?: RegExp;
+    timing?: TimingConstraint;
+  }
+  
+  export type ExtractedData = Record<string, any>;
+
+  export interface BehavioralPattern {
+    name: string;
+    pattern: RequestPattern[];
+    significance: number; // 0-1
+    extract: (matches: any[]) => ExtractedData;
+  }
+  // --- End New Interfaces ---
+  
+  export interface SessionState {
+    authTimestamp?: number;
+    isAuthenticated: boolean;
+  }
+
+  export interface TimeWindow {
+      start: Date;
+      end: Date;
+  }
+
+  export interface RequestContext {
+    previousRequests: any[]; // Using any to avoid circular dependency with HarEntry
+    subsequentRequests: any[];
+    sessionState: SessionState;
+    timeWindow: TimeWindow;
+    referrerChain: string[];
+  }
+
+  export interface ContextualFilterRule {
+    name: string;
+    condition: (entry: any, context: RequestContext) => boolean;
+    weight: number;
+    metadata?: Record<string, any>;
+  }
+
+  export interface EnhancedFilteringCriteria {
+    endpointPatterns: {
+      include: RegExp[];
+      exclude: RegExp[];
+      priorityPatterns: { pattern: RegExp; weight: number }[];
+    };
+    
+    resourceTypeWeights: Map<ResourceType, number>;
+    
+    contextualRules: ContextualFilterRule[];
+    
+    behavioralPatterns: BehavioralPattern[];
+    
+    scoreThresholds: {
+      minimum: number;
+      optimal: number;
+      includeThreshold: number;
+    };
+  }
+
+  export enum ParameterType {
+    STRING,
+    NUMBER,
+    BOOLEAN,
+    OBJECT,
+    ARRAY,
+    JWT,
+    API_KEY
+  }
+
+  export interface EndpointCharacteristics {
+    hasAuthentication: boolean;
+    hasStateChange: boolean;
+    hasDataSubmission: boolean;
+    hasSensitiveData: boolean;
+    isIdempotent: boolean;
+    httpMethods: string[];
+    parameterTypes: ParameterType[];
+  }
+
+  export interface EndpointClassifier {
+    classifyEndpoint(request: Request): ResourceType[];
+    getEndpointCharacteristics(url: string): EndpointCharacteristics;
+  }
+
+  export enum TokenDetectionScope {
+    FORM_BASED_ONLY = 'form_based_only',
+    COMPREHENSIVE_SCAN = 'comprehensive_scan',
+    SESSION_MANAGEMENT_FOCUSED = 'session_management_focused',
+    USER_CONFIGURED = 'user_configured',
+  }
+
+  export enum CodeTemplateType {
+    SINGLE_REQUEST_TEMPLATE = 'single_request_template',
+    AUTHENTICATION_FAILURE_TEMPLATE = 'authentication_failure_template',
+    AUTHENTICATION_SUCCESS_TEMPLATE = 'authentication_success_template',
+    MULTI_STEP_FLOW_TEMPLATE = 'multi_step_flow_template',
+    GENERIC_TEMPLATE = 'generic_template',
+  }
+
+  export interface Configuration {
+    mode: Predefined;
+    filtering: EnhancedFilteringCriteria;
+    tokenDetection: {
+      scope: TokenDetectionScope;
+      customPatterns?: RegExp[];
+    };
+    codeGeneration: {
+      template: CodeTemplateType;
+      includeComments: boolean;
+    };
   }
 }

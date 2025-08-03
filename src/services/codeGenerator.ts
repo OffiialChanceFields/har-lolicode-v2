@@ -1,5 +1,5 @@
 // src/services/codeGenerator.ts
-import { AnalysisMode, CodeTemplateType } from './AnalysisMode';
+import { AnalysisMode } from './AnalysisMode';
 import { HarEntry, DetectedToken } from './TokenDetector';
 
 class CodeGenerationError extends Error {
@@ -40,8 +40,8 @@ class GenericRequestTemplate {
 // Main Generator Class
 export class ContextualCodeGenerator {
   constructor(
-    private readonly analysisMode: AnalysisMode,
-    private readonly templateType: CodeTemplateType
+    private readonly analysisMode: AnalysisMode.Predefined,
+    private readonly templateType: AnalysisMode.CodeTemplateType
   ) {}
 
   generateOptimizedLoliCode(

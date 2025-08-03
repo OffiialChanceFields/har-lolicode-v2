@@ -3,10 +3,9 @@ import { useDropzone } from "react-dropzone";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Shield, Upload, Link, FileCheck, BrainCircuit, XCircle, Eye, Globe, CheckCircle, Settings, Info, Badge } from "lucide-react";
+import { Shield, Upload, FileCheck, BrainCircuit, XCircle, Eye, Globe, CheckCircle, Settings, Info, Badge } from "lucide-react";
 import { JsonViewerModal } from "./JsonViewerModal";
 import { AnalysisMode, AnalysisModeRegistry } from "@/services/AnalysisMode";
 import { useHarAnalysis } from "@/hooks/useHarAnalysis";
@@ -14,8 +13,6 @@ import { useHarAnalysis } from "@/hooks/useHarAnalysis";
 interface HarUploadProps {
   onFileSelect: (file: File, content: string) => void;
   isProcessing: boolean;
-  targetUrl: string;
-  onTargetUrlChange: (url: string) => void;
 }
 
 const AnalysisModePreview: React.FC<{ mode: AnalysisMode }> = ({ mode }) => {
@@ -82,13 +79,10 @@ const AnalysisModeSelect: React.FC<{
 export const HarUpload: React.FC<HarUploadProps> = ({ 
   onFileSelect, 
   isProcessing,
-  targetUrl,
-  onTargetUrlChange
 }) => {
     const [securityWarningAccepted, setSecurityWarningAccepted] = useState(true);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [fileContent, setFileContent] = useState<string | null>(null);
-    const [urlError, setUrlError] = useState<string | null>(null);
     const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
     const { analysisMode, setAnalysisMode } = useHarAnalysis(AnalysisMode.SUCCESSFUL_AUTHENTICATION);
 
@@ -97,11 +91,6 @@ export const HarUpload: React.FC<HarUploadProps> = ({
         try { return JSON.parse(fileContent); } catch { return { error: "Failed to parse HAR." }; }
     }, [fileContent]);
 
-    const isValidUrl = useMemo(() => {
-      if (!targetUrl) return false;
-      try { new URL(targetUrl); setUrlError(null); return true; } catch { setUrlError("Invalid URL."); return false; }
-    }, [targetUrl]);
-  
     const onDrop = useCallback((acceptedFiles: File[]) => {
       const file = acceptedFiles[0];
       if (file && file.name.endsWith('.har')) {
@@ -123,7 +112,7 @@ export const HarUpload: React.FC<HarUploadProps> = ({
     }, []);
 
     const handleAnalyze = () => {
-      if (selectedFile && fileContent && isValidUrl) {
+      if (selectedFile && fileContent) {
         onFileSelect(selectedFile, fileContent);
       }
     };
@@ -135,7 +124,7 @@ export const HarUpload: React.FC<HarUploadProps> = ({
       disabled: isProcessing || !securityWarningAccepted
     });
   
-    const isReadyForAnalysis = selectedFile && isValidUrl && !isProcessing;
+    const isReadyForAnalysis = selectedFile && !isProcessing;
 
     return (
       <div className="space-y-6">
@@ -143,14 +132,6 @@ export const HarUpload: React.FC<HarUploadProps> = ({
         
         {securityWarningAccepted && (
           <>
-            <Card className="p-4 space-y-4">
-              <div>
-                <Label htmlFor="target-url" className="flex items-center gap-2 mb-2 text-sm font-medium"><Link className="h-4 w-4 text-primary" />Target URL</Label>
-                <Input id="target-url" type="url" placeholder="e.g., https://api.example.com" value={targetUrl} onChange={(e) => onTargetUrlChange(e.target.value)} disabled={isProcessing} className={`bg-background ${urlError ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                {urlError && <p className="text-xs text-destructive mt-2 flex items-center gap-1"><XCircle className="h-3 w-3"/>{urlError}</p>}
-              </div>
-            </Card>
-
             <AnalysisModeSelect selectedMode={analysisMode} onModeChange={setAnalysisMode} disabled={isProcessing} />
 
             <Card className={`border-2 border-dashed transition-all duration-300 ${isDragActive ? 'border-primary bg-primary/5 shadow-glow' : 'border-border hover:border-primary/50'}`}>

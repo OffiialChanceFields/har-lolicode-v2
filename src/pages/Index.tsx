@@ -8,7 +8,8 @@ import { AsyncHarProcessor } from '@/services/AsyncHarProcessor';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { InfoModal } from '@/components/InfoModal';
-import { useHarAnalysis } from '@/hooks/useHarAnalysis';
+import { Link } from 'react-router-dom';
+import { AnalysisMode } from '@/services/AnalysisMode';
 
 interface ProcessingState {
   isProcessing: boolean;
@@ -20,6 +21,7 @@ interface ProcessingState {
       requestsFound: number;
       tokensDetected: number;
       criticalPath: string[];
+      matchedPatterns: any[];
     };
   } | null;
   filename: string;
@@ -29,6 +31,7 @@ const PIPELINE_STEPS = [
     { id: 'streaming', title: 'Reading HAR File' },
     { id: 'filtering', title: 'Filtering Requests' },
     { id: 'scoring', title: 'Scoring Requests' },
+    { id: 'behavioral_analysis', title: 'Behavioral Analysis'},
     { id: 'analysis', title: 'Analyzing Dependencies' },
     { id: 'generation', title: 'Generating LoliCode' }
 ];
@@ -41,10 +44,8 @@ const Index = () => {
     result: null,
     filename: ''
   });
-  const [targetUrl, setTargetUrl] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { toast } = useToast();
-  const { getConfiguration } = useHarAnalysis();
 
   const handleProcessing = async (file: File, content: string) => {
     setProcessing({ isProcessing: true, filename: file.name, currentStep: 0, progress: 0, result: null });
@@ -55,8 +56,74 @@ const Index = () => {
     };
 
     try {
-      const analysisConfig = getConfiguration();
-      const result = await AsyncHarProcessor.processHarFileStreaming(content, targetUrl, analysisConfig, progressCallback);
+        const config: AnalysisMode.Configuration = {
+            mode: AnalysisMode.Predefined.AUTOMATIC,
+            filtering: {
+                endpointPatterns: {
+                    include: [],
+                    exclude: [/google-analytics.com/, /_next\/static/, /\.css$/, /\.js$/, /\.svg$/, /\.png$/, /\.jpg$/, /\.woff2$/],
+                    priorityPatterns: [{ pattern: /api/, weight: 20 }]
+                },
+                resourceTypeWeights: new Map([
+                    [AnalysisMode.ResourceType.API_ENDPOINT, 30],
+                    [AnalysisMode.ResourceType.FORM_SUBMISSION, 40],
+                    [AnalysisMode.ResourceType.STATIC_ASSET, -50]
+                ]),
+                contextualRules: [
+                    {
+                        name: 'post_authentication_requests',
+                        condition: (entry, ctx) => {
+                          const authCompleted = ctx.previousRequests.some(r => 
+                            r.request.url.includes('/login') && r.response.status === 200
+                          );
+                          return authCompleted && new Date(entry.startedDateTime).getTime() > (ctx.sessionState.authTimestamp || 0);
+                        },
+                        weight: 0.8
+                      },
+                      {
+                        name: 'form_submission_sequence',
+                        condition: (entry, ctx) => {
+                          const hasFormView = ctx.previousRequests.some(r => 
+                            r.response.content.mimeType?.includes('text/html') &&
+                            r.response.content.text?.includes('<form')
+                          );
+                          return hasFormView && entry.request.method === 'POST';
+                        },
+                        weight: 0.9
+                      }
+                ],
+                behavioralPatterns: [
+                    {
+                        name: 'oauth_flow',
+                        significance: 0.95,
+                        pattern: [
+                          { urlPattern: /\/authorize/, methodPattern: ['GET'] },
+                          { urlPattern: /\/callback/, statusPattern: [302, 303] },
+                          { urlPattern: /\/token/, methodPattern: ['POST'] }
+                        ],
+                        extract: (matches) => ({
+                          authorizationEndpoint: matches[0]?.request.url,
+                          callbackEndpoint: matches[1]?.request.url,
+                          tokenEndpoint: matches[2]?.request.url,
+                        })
+                      }
+                ],
+                scoreThresholds: {
+                    minimum: 20,
+                    optimal: 70,
+                    includeThreshold: 25
+                }
+            },
+            tokenDetection: {
+                scope: AnalysisMode.TokenDetectionScope.COMPREHENSIVE_SCAN
+            },
+            codeGeneration: {
+                template: AnalysisMode.CodeTemplateType.GENERIC_TEMPLATE,
+                includeComments: true
+            }
+        };
+
+      const result = await AsyncHarProcessor.processHarFileStreaming(content, config, progressCallback);
       setProcessing(prev => ({ ...prev, result, isProcessing: false, progress: 100, currentStep: PIPELINE_STEPS.length }));
     } catch (error: unknown) {
       console.error('Processing failed:', error);
@@ -68,7 +135,6 @@ const Index = () => {
 
   const resetProcessor = () => {
     setProcessing({ isProcessing: false, currentStep: 0, progress: 0, result: null, filename: '' });
-    setTargetUrl('');
   };
 
   return (
@@ -82,14 +148,21 @@ const Index = () => {
             </div>
             <h1 className="text-2xl font-bold bg-gradient-cyber bg-clip-text text-transparent">HAR2LoliCode</h1>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(true)} className="transition-glow"><HelpCircle className="h-5 w-5" /></Button>
+          <div className="flex items-center space-x-4">
+            <Link to="/har-converter">
+                <Button variant="outline">
+                    HAR to LoliCode Converter
+                </Button>
+            </Link>
+            <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(true)} className="transition-glow"><HelpCircle className="h-5 w-5" /></Button>
+          </div>
         </div>
       </header>
 
       <main className="container mx-auto px-6 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 space-y-6">
-            <HarUpload onFileSelect={handleProcessing} isProcessing={processing.isProcessing} targetUrl={targetUrl} onTargetUrlChange={setTargetUrl} />
+            <HarUpload onFileSelect={handleProcessing} isProcessing={processing.isProcessing} />
             {(processing.isProcessing || processing.result) && (
               <Card className="bg-gradient-glow border-border/50 p-6 shadow-elevation">
                 <h3 className="text-lg font-semibold mb-4 text-center">Processing Pipeline</h3>
@@ -115,7 +188,7 @@ const Index = () => {
               <Card className="p-12 text-center bg-gradient-glow border-border/50 flex flex-col items-center justify-center h-full shadow-elevation">
                 <div className="animate-pulse-glow mb-6"><UploadCloud className="h-20 w-20 text-primary" /></div>
                 <h3 className="text-2xl font-bold text-foreground mb-2">Ready for Analysis</h3>
-                <p className="text-muted-foreground max-w-md mx-auto mb-8">Upload a HAR file, select an analysis mode, and provide a target URL to begin.</p>
+                <p className="text-muted-foreground max-w-md mx-auto mb-8">Upload a HAR file and select an analysis mode to begin.</p>
                 <div className="flex gap-4 text-sm">
                   <div className="bg-muted/20 rounded-lg p-3 border border-border/50"><div className="font-medium text-primary">Advanced Detection</div><div className="text-muted-foreground">CSRF, Dynamic Tokens</div></div>
                   <div className="bg-muted/20 rounded-lg p-3 border border-border/50"><div className="font-medium text-secondary">Secure by Design</div><div className="text-muted-foreground">100% Local Processing</div></div>
