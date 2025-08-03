@@ -135,13 +135,13 @@ export const DEFAULT_BEHAVIORAL_PATTERNS: AnalysisMode.BehavioralPattern[] = [
     significance: 0.95,
     pattern: [
       { urlPattern: /\/authorize/, methodPattern: ['GET'] },
-      { urlPattern: /\/callback/, statusPattern: [302, 303] },
+      { urlPattern: /\/callback/, statusPattern: },
       { urlPattern: /\/token/, methodPattern: ['POST'] }
     ],
     extract: (matches) => ({
-      authorizationEndpoint: matches[0]?.request?.url,
-      callbackEndpoint: matches[1]?.request?.url,
-      tokenEndpoint: matches[2]?.request?.url,
+      authorizationEndpoint: matches?.request?.url,
+      callbackEndpoint: matches?.request?.url,
+      tokenEndpoint: matches?.request?.url,
       state: extractOAuthState(matches)
     })
   },
@@ -149,13 +149,13 @@ export const DEFAULT_BEHAVIORAL_PATTERNS: AnalysisMode.BehavioralPattern[] = [
     name: 'form_based_login',
     significance: 0.9,
     pattern: [
-      { urlPattern: /\/(login|signin)/, methodPattern: ['GET'], statusPattern: [200] },
+      { urlPattern: /\/(login|signin)/, methodPattern: ['GET'], statusPattern: },
       { urlPattern: /\/(login|signin|authenticate)/, methodPattern: ['POST'] }
     ],
     extract: (matches) => ({
-      loginFormEndpoint: matches[0]?.request?.url,
-      authenticationEndpoint: matches[1]?.request?.url,
-      credentials: matches[1]?.request?.postData
+      loginFormEndpoint: matches?.request?.url,
+      authenticationEndpoint: matches?.request?.url,
+      credentials: matches?.request?.postData
     })
   },
   {
@@ -170,7 +170,7 @@ export const DEFAULT_BEHAVIORAL_PATTERNS: AnalysisMode.BehavioralPattern[] = [
       }
     ],
     extract: (matches) => {
-        const match = matches[0];
+        const match = matches;
         if (!match || !match.request || !Array.isArray(match.request.headers)) {
             return {};
         }
@@ -184,7 +184,7 @@ export const DEFAULT_BEHAVIORAL_PATTERNS: AnalysisMode.BehavioralPattern[] = [
 
         let authMethod = 'Unknown';
         if (authHeader && /^(Bearer|APIKey)/.test(authHeader.value)) {
-            authMethod = authHeader.value.split(' ')[0];
+            authMethod = authHeader.value.split(' ');
         } else if (apiKeyHeader) {
             authMethod = 'APIKey';
         }

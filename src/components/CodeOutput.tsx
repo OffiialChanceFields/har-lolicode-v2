@@ -6,26 +6,33 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Highlight } from 'prism-react-renderer';
 import openBulletTheme from '@/lib/openbullet-theme';
+import { HarAnalysisResult } from '@/services/types';
 
 interface CodeOutputProps {
-  loliCode: string;
-  analysis: {
-    requestsFound: number;
-    tokensDetected: number;
-    criticalPath: string[];
-    matchedPatterns: any[];
-  };
+  results: HarAnalysisResult;
   filename: string;
 }
 
-export const CodeOutput: React.FC<CodeOutputProps> = ({ 
-  loliCode, 
-  analysis, 
-  filename 
+export const CodeOutput: React.FC<CodeOutputProps> = ({
+  results,
+  filename
 }) => {
   const { toast } = useToast();
   const [activeView, setActiveView] = React.useState<'code' | 'analysis'>('code');
   const [copied, setCopied] = React.useState(false);
+
+  if (!results) {
+    return null;
+  }
+
+  const { loliCode, metrics, detectedTokens } = results;
+
+  const analysis = {
+    requestsFound: metrics.significantRequests,
+    tokensDetected: Object.keys(detectedTokens).length,
+    criticalPath: (results as any).criticalPath || [],
+    matchedPatterns: (results as any).matchedPatterns || [],
+  };
 
   const copyToClipboard = async () => {
     try {

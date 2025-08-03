@@ -1,10 +1,10 @@
 import { EndpointScoringService, AnalysisContext } from './scoring';
 import { StreamingHarParser } from './StreamingHarParser';
 import { AnalysisMode } from './AnalysisMode';
+import { ProductionTokenDetector } from './TokenDetector';
 
 // Assuming HarEntry and HarAnalysisResult are defined elsewhere
-import { HarEntry } from './types'; // You might need to create a types file
-import { HarAnalysisResult }_from './types';
+import { HarEntry, HarAnalysisResult } from './types'; // You might need to create a types file
 
 export class AsyncHarProcessor {
     public static async processHarFileStreaming(
@@ -45,18 +45,17 @@ export class AsyncHarProcessor {
         const scoringService = new EndpointScoringService();
         const analysisContext: Omit<AnalysisContext, 'currentIndex'> = { allEntries, criteria: config.filtering };
         
-        const scoredEntries = allEntries.map((entry, index) => ({
-            ...entry,
-            score: scoringService.score(entry, { ...analysisContext, currentIndex: index })
-        })).filter(entry => entry.score > 0);
+        const scoredEntries = allEntries.map((entry, index) => scoringService.scoreEntry(entry, { ...analysisContext, currentIndex: index }))
+            .filter(entry => entry.finalScore > 0);
 
         if (scoredEntries.length === 0) {
             throw new Error("No relevant requests found in the HAR file after filtering. Please check the analysis mode configuration or try a different HAR file.");
         }
 
         progressCallback?.(25, 'token-detection');
-        // Placeholder for token detection logic
-        const tokens = {}; // detected tokens
+        
+        const tokenDetector = new ProductionTokenDetector();
+        const detectedTokens = await tokenDetector.detectDynamicTokens(scoredEntries);
 
         progressCallback?.(50, 'code-generation');
         // Placeholder for code generation
@@ -72,7 +71,7 @@ export class AsyncHarProcessor {
                 processingTime: 0, // to be implemented
             },
             loliCode: generatedCode,
-            detectedTokens: tokens,
+            detectedTokens: detectedTokens,
         };
     }
 
