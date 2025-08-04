@@ -93,4 +93,24 @@ export namespace AnalysisMode {
     customPatterns?: RegExp[];
   }
 
+  // --- Inserted for scoring.ts compatibility ---
+  export interface ContextualFilterRule {
+    condition: (entry: HarEntry, context: AnalysisContext) => boolean;
+    weight: number;
+  }
+
+  export interface BehavioralPattern {
+    id: string;
+    description?: string;
+    weight?: number;
+  }
+
+  export interface AnalysisContext {
+    previousRequests: HarEntry[];
+    sessionState: { isAuthenticated: boolean };
+    criteria: FilteringConfig;
+    allEntries: HarEntry[];
+    currentIndex: number;
+  }
+
   
