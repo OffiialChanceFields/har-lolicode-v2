@@ -54,51 +54,54 @@ export interface HarResponse {
   bodySize: number;
 }
 
+export interface RequestParameter {
+  name: string;
+  value: string;
+  location: 'query' | 'body' | 'header';
+  isCredential?: boolean;
+}
+
 export interface HarEntry {
   startedDateTime: string;
   time: number;
-  request: HarRequest;
-  response: HarResponse;
+  request: {
+    method: string;
+    url: string;
+    httpVersion: string;
+    headers: { name: string; value: string }[];
+    queryString: { name: string; value: string }[];
+    cookies: { name: string; value: string; path?: string; domain?: string; expires?: string; httpOnly?: boolean; secure?: boolean; sameSite?: string }[];
+    headersSize: number;
+    bodySize: number;
+    postData?: {
+      mimeType: string;
+      text?: string;
+      params?: { name: string; value: string }[];
+    };
+  };
+  response: {
+    status: number;
+    statusText: string;
+    httpVersion: string;
+    headers: { name: string; value: string }[];
+    cookies: { name: string; value: string; path?: string; domain?: string; expires?: string; httpOnly?: boolean; secure?: boolean; sameSite?: string }[];
+    content: {
+      size: number;
+      compression?: number;
+      mimeType: string;
+      text?: string;
+      encoding?: string;
+    };
+    redirectURL: string;
+    headersSize: number;
+    bodySize: number;
+  };
   cache?: Record<string, unknown>;
   timings?: Record<string, unknown>;
   serverIPAddress?: string;
   connection?: string;
   comment?: string;
-  // Custom properties for analysis
-  resourceTypes?: AnalysisMode.ResourceType[];
-  score?: number;
-  detectedTokens?: DetectedToken[];
-}
-
-// Token-related Types
-export enum TokenType {
-  CSRF_TOKEN = 'csrf_token',
-  SESSION_TOKEN = 'session_token',
-  JWT_ACCESS_TOKEN = 'jwt_access_token',
-  JWT_REFRESH_TOKEN = 'jwt_refresh_token',
-  OAUTH_STATE = 'oauth_state',
-  OAUTH_CODE_VERIFIER = 'oauth_code_verifier',
-  OAUTH_CODE_CHALLENGE = 'oauth_code_challenge',
-  NONCE = 'nonce',
-  VIEWSTATE = 'viewstate',
-  EVENTVALIDATION = 'eventvalidation',
-  CAPTCHA_TOKEN = 'captcha_token',
-  API_KEY = 'api_key',
-  BEARER_TOKEN = 'bearer_token',
-  CUSTOM_HEADER_TOKEN = 'custom_header_token',
-  FORM_BUILD_ID = 'form_build_id',
-  DRUPAL_FORM_TOKEN = 'drupal_form_token',
-  LARAVEL_TOKEN = 'laravel_token',
-  DJANGO_CSRF = 'django_csrf',
-  RAILS_AUTHENTICITY = 'rails_authenticity',
-}
-
-export interface DetectedToken {
-  name: string;
-  value: string;
-  type: TokenType;
-  source: 'header' | 'body' | 'cookie' | 'url';
-  confidence: number;
+  parameters?: RequestParameter[];
 }
 
 // OB2 LoliCode Generation Types
