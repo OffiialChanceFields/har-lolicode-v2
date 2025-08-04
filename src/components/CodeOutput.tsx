@@ -3,7 +3,7 @@ import { Copy, Download, Code2, Check, Zap, FileText, Share2, Package } from 'lu
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from "sonner";
 import { Highlight } from 'prism-react-renderer';
 import openBulletTheme from '@/lib/openbullet-theme';
 import { HarAnalysisResult } from '@/services/types';
@@ -17,7 +17,7 @@ export const CodeOutput: React.FC<CodeOutputProps> = ({
   results,
   filename
 }) => {
-  const { toast } = useToast();
+  
   const [activeView, setActiveView] = React.useState<'code' | 'analysis'>('code');
   const [copied, setCopied] = React.useState(false);
 
@@ -38,16 +38,13 @@ export const CodeOutput: React.FC<CodeOutputProps> = ({
     try {
       await navigator.clipboard.writeText(loliCode);
       setCopied(true);
-      toast({
-        title: "Copied to clipboard",
-        description: "LoliCode has been copied to your clipboard",
+      toast.success("Copied to clipboard", {
+        description: "LoliCode has been copied to your clipboard.",
       });
       setTimeout(() => setCopied(false), 2500);
     } catch (error) {
-      toast({
-        title: "Copy failed",
+      toast.error("Copy failed", {
         description: "Unable to copy to clipboard. Please try again.",
-        variant: "destructive"
       });
     }
   };

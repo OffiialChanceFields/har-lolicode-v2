@@ -6,11 +6,12 @@ import { ProcessingPipeline } from '@/components/ProcessingPipeline';
 import { CodeOutput } from '@/components/CodeOutput';
 import { AsyncHarProcessor } from '@/services/AsyncHarProcessor';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 import { InfoModal } from '@/components/InfoModal';
 import { Link } from 'react-router-dom';
 import { AnalysisMode, AnalysisModeService } from '@/services/AnalysisMode';
 import { AnalysisModeSelector } from '@/components/AnalysisModeSelector';
+import { toast } from "sonner";
+import { errorMapping } from '@/services/errorMapping';
 
 interface ProcessingState {
   isProcessing: boolean;
@@ -47,7 +48,6 @@ const Index = () => {
   });
   const [selectedMode, setSelectedMode] = useState<AnalysisMode.Predefined>(AnalysisMode.Predefined.AUTOMATIC);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { toast } = useToast();
 
   const handleProcessing = async (file: File, content: string) => {
     setProcessing({ isProcessing: true, filename: file.name, currentStep: 0, progress: 0, result: null });
@@ -67,8 +67,9 @@ const Index = () => {
       setProcessing(prev => ({ ...prev, result, isProcessing: false, progress: 100, currentStep: PIPELINE_STEPS.length }));
     } catch (error: unknown) {
       console.error('Processing failed:', error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-      toast({ title: "Analysis Failed", description: errorMessage, variant: "destructive" });
+            const errorType = error?.constructor as new () => Error;
+      const errorInfo = errorMapping.get(errorType) || { title: 'Analysis Failed', description: 'An unknown error occurred. Please check the console for more details.' };
+      toast.error(errorInfo.title, { description: errorInfo.description });
       setProcessing(prev => ({ ...prev, isProcessing: false, progress: 0, currentStep: 0 }));
     }
   };
