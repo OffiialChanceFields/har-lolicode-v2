@@ -61,25 +61,34 @@ export interface RequestParameter {
   isCredential?: boolean;
 }
 
-// TokenType and DetectedToken restored
 export enum TokenType {
-  Unknown = 'Unknown',
-  ApiKey = 'ApiKey',
-  Bearer = 'Bearer',
-  Basic = 'Basic',
-  Cookie = 'Cookie',
-  JWT = 'JWT',
-  OAuth = 'OAuth',
-  Session = 'Session',
-  Other = 'Other',
+  CSRF_TOKEN = 'csrf_token',
+  SESSION_TOKEN = 'session_token',
+  JWT_ACCESS_TOKEN = 'jwt_access_token',
+  JWT_REFRESH_TOKEN = 'jwt_refresh_token',
+  OAUTH_STATE = 'oauth_state',
+  OAUTH_CODE_VERIFIER = 'oauth_code_verifier',
+  OAUTH_CODE_CHALLENGE = 'oauth_code_challenge',
+  NONCE = 'nonce',
+  VIEWSTATE = 'viewstate',
+  EVENTVALIDATION = 'eventvalidation',
+  CAPTCHA_TOKEN = 'captcha_token',
+  API_KEY = 'api_key',
+  BEARER_TOKEN = 'bearer_token',
+  CUSTOM_HEADER_TOKEN = 'custom_header_token',
+  FORM_BUILD_ID = 'form_build_id',
+  DRUPAL_FORM_TOKEN = 'drupal_form_token',
+  LARAVEL_TOKEN = 'laravel_token',
+  DJANGO_CSRF = 'django_csrf',
+  RAILS_AUTHENTICITY = 'rails_authenticity',
 }
 
 export interface DetectedToken {
-  type: TokenType;
+  name: string;
   value: string;
-  location: string;
-  name?: string;
-  confidence?: number;
+  type: TokenType;
+  source: 'header' | 'body' | 'cookie' | 'url';
+  confidence: number;
 }
 
 export interface HarEntry {
