@@ -21,6 +21,10 @@ const modeDetails = {
   [AnalysisMode.Predefined.MANUAL]: {
     title: 'Manual Mode',
     description: 'Full control over the analysis process. For expert users.'
+  },
+  [AnalysisMode.Predefined.CUSTOM]: {
+    title: 'Custom Mode',
+    description: 'Custom analysis mode with custom settings.'
   }
 };
 

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { InfoModal } from '@/components/InfoModal';
 import { Link } from 'react-router-dom';
-import { AnalysisMode, AnalysisModeRegistry } from '@/services/AnalysisMode';
+import { AnalysisMode, AnalysisModeService } from '@/services/AnalysisMode';
 import { AnalysisModeSelector } from '@/components/AnalysisModeSelector';
 
 interface ProcessingState {
@@ -58,7 +58,11 @@ const Index = () => {
     };
 
     try {
-      const config = AnalysisModeRegistry.getConfiguration(selectedMode);
+      const analysisModeService = new AnalysisModeService();
+      const config = analysisModeService.get(selectedMode);
+      if (!config) {
+        throw new Error(`Analysis mode ${selectedMode} not found`);
+      }
       const result = await AsyncHarProcessor.processHarFileStreaming(content, config, progressCallback);
       setProcessing(prev => ({ ...prev, result, isProcessing: false, progress: 100, currentStep: PIPELINE_STEPS.length }));
     } catch (error: unknown) {
