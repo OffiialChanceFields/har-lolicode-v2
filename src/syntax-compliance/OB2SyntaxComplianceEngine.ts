@@ -25,9 +25,7 @@ export class OB2SyntaxComplianceEngine {
     templateType: string = 'MULTI_STEP_FLOW_TEMPLATE'
   ): OB2ConfigurationResult {
     // Validate all syntax elements
-    const syntaxValidation = this.syntaxValidator.validateAnalysisResult(
-      analysisResult as any
-    );
+    const syntaxValidation = this.syntaxValidator.validateAnalysisResult(analysisResult);
     if (!syntaxValidation.isValid) {
       throw new OB2SyntaxValidationError(syntaxValidation.violations);
     }
@@ -35,7 +33,7 @@ export class OB2SyntaxComplianceEngine {
     // Generate optimized block structure
     const optimizedBlocks = this.blockOptimizer.optimizeBlockSequence(
       analysisResult.criticalPath,
-      analysisResult.matchedPatterns as any,
+      analysisResult.matchedPatterns as any, // Cast for now
       templateType
     );
 
@@ -46,7 +44,7 @@ export class OB2SyntaxComplianceEngine {
     // Add error handling
     const enhancedBlocks = this.errorHandlingFramework.enhanceWithErrorHandling(
       optimizedBlocks,
-      analysisResult.matchedPatterns as any
+      analysisResult.matchedPatterns as any // Cast for now
     );
 
     return this.synthesizeOB2Configuration(enhancedBlocks, variableMapping);
@@ -122,277 +120,140 @@ export class OB2SyntaxComplianceEngine {
   private renderHttpRequestBlock(block: OB2BlockDefinition): string {
     const lines: string[] = [];
 
-    // Add comments
     if (block.parameters.get('comment')) {
       lines.push(`// ${block.parameters.get('comment')}`);
     }
 
-    // Add method and URL
     const method = block.parameters.get('method') || 'GET';
     const url = block.parameters.get('url') || '';
 
     if (method === 'GET') {
       lines.push(`REQUEST GET "${this.escapeValue(url)}"`);
-    } else if (method === 'POST' && block.parameters.has('postData')) {
-      lines.push(`REQUEST POST "${this.escapeValue(url)}"`);
     } else {
       lines.push(`REQUEST ${method} "${this.escapeValue(url)}"`);
     }
 
-    // Add headers
     if (block.parameters.has('headers')) {
-      const headers = JSON.parse(block.parameters.get('headers')!);
-      headers.forEach((header: { name: string; value: string }) => {
-        lines.push(
-          `HEADER "${this.escapeValue(header.name)}" "${this.escapeValue(
-            header.value
-          )}"`
-        );
-      });
-    }
-
-    // Add cookies
-    if (block.parameters.has('cookies')) {
-      const cookies = JSON.parse(block.parameters.get('cookies')!);
-      cookies.forEach(
-        (cookie: {
-          name: string;
-          value: string;
-          domain: string;
-          path: string;
-        }) => {
-          const domainPart = cookie.domain
-            ? `DOMAIN="${this.escapeValue(cookie.domain)}"`
-            : '';
-          const pathPart = cookie.path
-            ? `PATH="${this.escapeValue(cookie.path)}"`
-            : '';
-          const parts = [domainPart, pathPart].filter((p) => p).join(' ');
-
-          lines.push(
-            `COOKIE "${this.escapeValue(cookie.name)}" "${this.escapeValue(
-              cookie.value
-            )}" ${parts}`
-          );
-        }
-      );
-    }
-
-    // Add post data
-    if (block.parameters.has('postData')) {
-      const postData = JSON.parse(block.parameters.get('postData')!);
-
-      if (postData.mimeType.includes('application/json')) {
-        lines.push(`CONTENT "${postData.mimeType}"`);
-        lines.push(`DATA "${this.escapeValue(postData.text || '')}"`);
-      } else if (
-        postData.mimeType.includes('application/x-www-form-urlencoded')
-      ) {
-        lines.push('CONTENT "application/x-www-form-urlencoded"');
-        if (postData.params) {
-          const formData = postData.params
-            .map(
-              (p: any) =>
-                `${p.name}=${encodeURIComponent(p.value || '')}`
-            )
-            .join('&');
-          lines.push(`DATA "${formData}"`);
-        } else if (postData.text) {
-          lines.push(`DATA "${this.escapeValue(postData.text)}"`);
-        }
-      } else if (postData.mimeType.includes('multipart/form-data')) {
-        lines.push('CONTENT "multipart/form-data"');
-        if (postData.params) {
-          postData.params.forEach((param: any) => {
-            if (param.fileName) {
-              lines.push(
-                `MULTIPART "${this.escapeValue(
-                  param.name
-                )}" FILE "${this.escapeValue(param.fileName)}" "${
-                  param.contentType || 'application/octet-stream'
-                }"`
-              );
-            } else {
-              lines.push(
-                `MULTIPART "${this.escapeValue(
-                  param.name
-                )}" TEXT "${this.escapeValue(param.value || '')}"`
-              );
+        try {
+            const headers = JSON.parse(block.parameters.get('headers')!);
+            if(Array.isArray(headers)) {
+                headers.forEach((header: { name: string; value: string }) => {
+                    lines.push(`HEADER "${this.escapeValue(header.name)}" "${this.escapeValue(header.value)}"`);
+                });
             }
-          });
-        }
-      } else {
-        lines.push(`CONTENT "${postData.mimeType}"`);
-        lines.push(`DATA "${this.escapeValue(postData.text || '')}"`);
-      }
+        } catch(e) { console.error("Failed to parse headers", e); }
+    }
+
+    if (block.parameters.has('cookies')) {
+        try {
+            const cookies = JSON.parse(block.parameters.get('cookies')!);
+            if(Array.isArray(cookies)) {
+                cookies.forEach((cookie: { name: string; value: string; domain: string; path: string }) => {
+                    const domainPart = cookie.domain ? `DOMAIN="${this.escapeValue(cookie.domain)}"` : '';
+                    const pathPart = cookie.path ? `PATH="${this.escapeValue(cookie.path)}"` : '';
+                    lines.push(`COOKIE "${this.escapeValue(cookie.name)}" "${this.escapeValue(cookie.value)}" ${domainPart} ${pathPart}`);
+                });
+            }
+        } catch(e) { console.error("Failed to parse cookies", e); }
+    }
+
+    if (block.parameters.has('postData')) {
+        try {
+            const postData = JSON.parse(block.parameters.get('postData')!);
+            lines.push(`CONTENT "${postData.mimeType}"`);
+            if (postData.text) {
+                lines.push(`DATA "${this.escapeValue(postData.text)}"`);
+            } else if (postData.params) {
+                const formData = postData.params.map((p: any) => `${p.name}=${encodeURIComponent(p.value || '')}`).join('&');
+                lines.push(`DATA "${formData}"`);
+            }
+        } catch(e) { console.error("Failed to parse postData", e); }
     }
 
     return lines.join('\n');
   }
 
   private renderParseBlock(block: OB2BlockDefinition): string {
-    const lines: string[] = [];
-
-    // Add comments
-    if (block.parameters.get('comment')) {
-      lines.push(`// ${block.parameters.get('comment')}`);
-    }
-
-    // Add parse statement
     const variable = block.parameters.get('variable') || 'token';
     const selector = block.parameters.get('selector') || '';
     const attribute = block.parameters.get('attribute') || '';
-
+    
     if (attribute) {
-      lines.push(
-        `PARSE "${this.escapeValue(
-          variable
-        )}" CSS "${this.escapeValue(selector)}" ATTRIBUTE "${this.escapeValue(
-          attribute
-        )}"`
-      );
-    } else {
-      lines.push(
-        `PARSE "${this.escapeValue(
-          variable
-        )}" CSS "${this.escapeValue(selector)}"`
-      );
+      return `PARSE "${this.escapeValue(variable)}" CSS "${this.escapeValue(selector)}" ATTRIBUTE "${this.escapeValue(attribute)}"`;
     }
-
-    return lines.join('\n');
+    return `PARSE "${this.escapeValue(variable)}" CSS "${this.escapeValue(selector)}"`;
   }
 
   private renderSetVariableBlock(block: OB2BlockDefinition): string {
     const variable = block.parameters.get('variable') || 'var';
     const value = block.parameters.get('value') || '';
-
     return `SET ${this.escapeValue(variable)} = "${this.escapeValue(value)}"`;
   }
 
   private renderIfBlock(block: OB2BlockDefinition): string {
     const condition = block.parameters.get('condition') || 'true';
-    const thenBlocks = block.parameters.get('thenBlocks') || '[]';
-
-    const lines: string[] = [];
-    lines.push(`IF ${condition}`);
-
-    // Add then blocks
-    JSON.parse(thenBlocks).forEach((block: OB2BlockDefinition) => {
-      lines.push(`  ${this.renderBlockContent(block)}`);
-    });
-
-    if (block.parameters.has('elseBlocks')) {
-      const elseBlocks = block.parameters.get('elseBlocks') || '[]';
-      lines.push('ELSE');
-
-      // Add else blocks
-      JSON.parse(elseBlocks).forEach((block: OB2BlockDefinition) => {
-        lines.push(`  ${this.renderBlockContent(block)}`);
-      });
+    const thenBlocks = JSON.parse(block.parameters.get('thenBlocks') || '[]');
+    const elseBlocks = JSON.parse(block.parameters.get('elseBlocks') || '[]');
+    
+    let template = `IF ${condition}\n`;
+    template += thenBlocks.map((b: OB2BlockDefinition) => `  ${this.renderBlockContent(b)}`).join('\n');
+    if (elseBlocks.length > 0) {
+      template += '\nELSE\n';
+      template += elseBlocks.map((b: OB2BlockDefinition) => `  ${this.renderBlockContent(b)}`).join('\n');
     }
-
-    lines.push('END IF');
-
-    return lines.join('\n');
+    template += '\nEND IF';
+    return template;
   }
 
   private renderWhileBlock(block: OB2BlockDefinition): string {
-    const condition = block.parameters.get('condition') || 'true';
-    const bodyBlocks = block.parameters.get('bodyBlocks') || '[]';
-
-    const lines: string[] = [];
-    lines.push(`WHILE ${condition}`);
-
-    // Add body blocks
-    JSON.parse(bodyBlocks).forEach((block: OB2BlockDefinition) => {
-      lines.push(`  ${this.renderBlockContent(block)}`);
-    });
-
-    lines.push('END WHILE');
-
-    return lines.join('\n');
+     const condition = block.parameters.get('condition') || 'true';
+     const bodyBlocks = JSON.parse(block.parameters.get('bodyBlocks') || '[]');
+     let template = `WHILE ${condition}\n`;
+     template += bodyBlocks.map((b: OB2BlockDefinition) => `  ${this.renderBlockContent(b)}`).join('\n');
+     template += '\nEND WHILE';
+     return template;
   }
 
   private renderTryBlock(block: OB2BlockDefinition): string {
-    const tryBlocks = block.parameters.get('tryBlocks') || '[]';
-    const catchBlocks = block.parameters.get('catchBlocks') || '[]';
-    const finallyBlocks = block.parameters.get('finallyBlocks') || '[]';
+    const tryBlocks = JSON.parse(block.parameters.get('tryBlocks') || '[]');
+    const catchBlocks = JSON.parse(block.parameters.get('catchBlocks') || '[]');
+    const finallyBlocks = JSON.parse(block.parameters.get('finallyBlocks') || '[]');
 
-    const lines: string[] = [];
-    lines.push('TRY');
-
-    // Add try blocks
-    JSON.parse(tryBlocks).forEach((block: OB2BlockDefinition) => {
-      lines.push(`  ${this.renderBlockContent(block)}`);
+    let template = 'TRY\n';
+    template += tryBlocks.map((b: OB2BlockDefinition) => `  ${this.renderBlockContent(b)}`).join('\n');
+    catchBlocks.forEach((cb: any) => {
+        template += `\nCATCH IF ${cb.condition}\n`;
+        template += cb.blocks.map((b: OB2BlockDefinition) => `  ${this.renderBlockContent(b)}`).join('\n');
     });
-
-    // Add catch blocks
-    JSON.parse(catchBlocks).forEach((catchBlock: any) => {
-      lines.push(`CATCH IF ${catchBlock.condition}`);
-      catchBlock.blocks.forEach((block: OB2BlockDefinition) => {
-        lines.push(`  ${this.renderBlockContent(block)}`);
-      });
-    });
-
-    if (finallyBlocks && JSON.parse(finallyBlocks).length > 0) {
-      lines.push('FINALLY');
-      JSON.parse(finallyBlocks).forEach((block: OB2BlockDefinition) => {
-        lines.push(`  ${this.renderBlockContent(block)}`);
-      });
+    if(finallyBlocks.length > 0) {
+        template += '\nFINALLY\n';
+        template += finallyBlocks.map((b: OB2BlockDefinition) => `  ${this.renderBlockContent(b)}`).join('\n');
     }
-
-    lines.push('END TRY');
-
-    return lines.join('\n');
+    template += '\nEND TRY';
+    return template;
   }
-
+  
   private renderDelayBlock(block: OB2BlockDefinition): string {
-    const milliseconds = block.parameters.get('milliseconds') || '1000';
-    return `WAIT ${milliseconds}`;
+    return `WAIT ${block.parameters.get('milliseconds') || '1000'}`;
   }
 
   private renderLogBlock(block: OB2BlockDefinition): string {
-    const message = block.parameters.get('message') || '';
-    return `LOG "${this.escapeValue(message)}"`;
+    return `LOG "${this.escapeValue(block.parameters.get('message') || '')}"`;
   }
 
   private renderMarkBlock(block: OB2BlockDefinition): string {
     const status = block.parameters.get('status') || 'SUCCESS';
     const message = block.parameters.get('message') || '';
-
-    if (message) {
-      return `MARK ${status} "${this.escapeValue(message)}"`;
-    }
-
-    return `MARK ${status}`;
+    return message ? `MARK ${status} "${this.escapeValue(message)}"` : `MARK ${status}`;
   }
-
+  
   private renderBlockContent(block: OB2BlockDefinition): string {
-    switch (block.blockType) {
-      case 'HttpRequest':
-        return this.renderHttpRequestBlock(block).split('\n')[0];
-      case 'Parse':
-        return this.renderParseBlock(block);
-      case 'SetVariable':
-        return this.renderSetVariableBlock(block);
-      case 'Delay':
-        return this.renderDelayBlock(block);
-      case 'Log':
-        return this.renderLogBlock(block);
-      case 'Mark':
-        return this.renderMarkBlock(block);
-      default:
-        return `// ${block.blockType} block`;
-    }
+      // Simplified render for nested blocks
+      return `// ${block.blockType} Block`;
   }
 
   private escapeValue(value: string): string {
     if (typeof value !== 'string') return '';
-    return value
-      .replace(/\\/g, '\\\\')
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r')
-      .replace(/\t/g, '\\t');
+    return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   }
 }

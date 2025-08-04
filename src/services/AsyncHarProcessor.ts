@@ -1,3 +1,4 @@
+import { EndpointScoringService, AnalysisContext } from './scoring';
 import {
   StreamingHarParser,
   ParseStatistics
@@ -8,6 +9,9 @@ import { OB2SyntaxComplianceEngine } from '../syntax-compliance/OB2SyntaxComplia
 import { FlowAnalysisEngine } from '../flow-analysis/FlowAnalysisEngine';
 import { AuthenticationPatternLibrary } from '../pattern-library/AuthenticationPatternLibrary';
 import { EndpointClassifier } from '../core/EndpointClassifier';
+import { RequestDependencyAnalyzer } from './dependency/RequestDependencyAnalyzer';
+import { RequestOptimizationEngine } from './optimization/RequestOptimizationEngine';
+import { MFAFlowAnalyzer } from './mfa/MFAFlowAnalyzer';
 
 import { HarEntry, HarAnalysisResult } from './types';
 
@@ -38,58 +42,97 @@ export class AsyncHarProcessor {
       allEntries.push(...batch);
     }
     const parseStats = parser.getStatistics();
-    const correlationMatrix = await parser.analyzeCorrelations(allEntries);
-    const criticalPathIndices = (parser as any).criticalPath || [];
-
+    
     if (allEntries.length === 0) {
       throw new Error(
         'The HAR file is valid, but it contains no network requests.'
       );
     }
 
-    // 1. Unified Flow Analysis
-    progressCallback?.(25, 'flow-analysis');
-    const patternLibrary = new AuthenticationPatternLibrary();
-    const endpointClassifier = new EndpointClassifier();
-    const flowAnalyzer = new FlowAnalysisEngine(
-      patternLibrary,
-      endpointClassifier
-    );
-    const flowContext = flowAnalyzer.analyzeFlowContext(
+    // 1. Contextual Scoring & Filtering
+    progressCallback?.(0, 'scoring');
+    const scoringService = new EndpointScoringService();
+    const analysisContext: Omit<AnalysisContext, 'currentIndex'> = {
       allEntries,
-      correlationMatrix,
-      criticalPathIndices
+      criteria: config.filtering
+    };
+
+    const scoredEntries = allEntries
+      .map((entry, index) =>
+        scoringService.scoreEntry(entry, {
+          ...analysisContext,
+          currentIndex: index
+        })
+      )
+      .filter((entry) => entry.finalScore > 0);
+
+    if (scoredEntries.length === 0) {
+      throw new Error(
+        'No relevant requests found in the HAR file after filtering. Please check the analysis mode configuration or try a different HAR file.'
+      );
+    }
+
+    // 2. Behavioral Analysis
+    progressCallback?.(15, 'behavioral-analysis');
+    const behavioralAnalyzer = new FlowAnalysisEngine(
+      new AuthenticationPatternLibrary(),
+      new EndpointClassifier()
+    );
+    // Note: The previous behavioralAnalyzer was a simpler one. 
+    // This is now covered by the FlowAnalysisEngine.
+    // We'll extract matchedPatterns from flowContext after analysis.
+
+    // 3. Dependency Analysis
+    progressCallback?.(30, 'dependency-analysis');
+    const dependencyAnalyzer = new RequestDependencyAnalyzer();
+    const correlationMatrix = await parser.analyzeCorrelations(scoredEntries);
+    const criticalPathIndices = (parser as any).criticalPath || [];
+    const dependencyAnalysis = dependencyAnalyzer.analyzeDependencies(scoredEntries);
+
+    // 4. Request Optimization
+    progressCallback?.(45, 'optimization');
+    const optimizationEngine = new RequestOptimizationEngine();
+    const optimizedFlow = optimizationEngine.optimizeRequestFlow(
+      dependencyAnalysis.criticalPath
     );
 
-    // 2. Token Detection
-    progressCallback?.(60, 'token-detection');
+    // 5. MFA Analysis
+    progressCallback?.(60, 'mfa-analysis');
+    const mfaAnalyzer = new MFAFlowAnalyzer();
+    const mfaAnalysis = mfaAnalyzer.analyzeMFAFlow(
+      optimizedFlow.optimizedRequests
+    );
+
+    // 6. Token Detection
+    progressCallback?.(75, 'token-detection');
+
     const tokenDetector = new TokenDetectionService();
-    const tokenExtractionResults = flowContext.criticalPath.map((entry) => {
+    const tokenExtractionResults = optimizedFlow.optimizedRequests.map((entry) => {
       const responseBody = entry.response.content?.text || '';
       return tokenDetector.detectTokensWithContext(entry, responseBody);
     });
 
-    // 3. Code Generation
-    progressCallback?.(80, 'code-generation');
+    // 7. Code Generation
+    progressCallback?.(90, 'code-generation');
 
     const codeGenerator = new OB2SyntaxComplianceEngine();
-    const codeGenResult = codeGenerator.generateCompliantLoliCode(flowContext);
+    // Pass the relevant parts of the analysis to the code generator
+    const codeGenResult = codeGenerator.generateCompliantLoliCode(behavioralAnalyzer.analyzeFlowContext(scoredEntries, correlationMatrix, criticalPathIndices));
 
     const analysisResult: HarAnalysisResult = {
-      requests: flowContext.criticalPath,
+      requests: optimizedFlow.optimizedRequests,
       metrics: {
         totalRequests: parseStats.totalEntries,
-        significantRequests: flowContext.criticalPath.length,
+        significantRequests: scoredEntries.length,
         processingTime: parseStats.processingTimeMs
       },
       loliCode: codeGenResult.loliCode,
       tokenExtractionResults: tokenExtractionResults,
-      flowContext: flowContext,
-      // Deprecated fields, kept for compatibility for now
-      matchedPatterns: [],
-      dependencyAnalysis: undefined,
-      optimizedFlow: undefined,
-      mfaAnalysis: []
+      matchedPatterns: behavioralAnalyzer.analyzeFlowContext(scoredEntries, correlationMatrix, criticalPathIndices).matchedPatterns, // Re-run or extract from flowContext
+      dependencyAnalysis: dependencyAnalysis,
+      optimizedFlow: optimizedFlow,
+      mfaAnalysis: mfaAnalysis,
+      flowContext: behavioralAnalyzer.analyzeFlowContext(scoredEntries, correlationMatrix, criticalPathIndices)
     };
 
     progressCallback?.(100, 'complete');
