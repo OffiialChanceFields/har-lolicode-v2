@@ -109,9 +109,12 @@ export class AsyncHarProcessor {
     progressCallback?.(75, 'token-detection');
 
     const tokenDetector = new TokenDetectionService();
-    const tokenExtractionResults = optimizedFlow.optimizedRequests.map((entry) => {
+    // Map each request's index to its extracted tokens
+    const detectedTokens = new Map<string, import('./types').DetectedToken[]>();
+    optimizedFlow.optimizedRequests.forEach((entry, idx) => {
       const responseBody = entry.response.content?.text || '';
-      return tokenDetector.detectTokensWithContext(entry, responseBody);
+      const tokens = tokenDetector.detectTokensWithContext(entry, responseBody);
+      detectedTokens.set(String(idx), tokens);
     });
 
     // 7. Code Generation
@@ -120,16 +123,28 @@ export class AsyncHarProcessor {
     const codeGenerator = new OB2SyntaxComplianceEngine();
     const codeGenResult = codeGenerator.generateCompliantLoliCode(flowContext, 'MULTI_STEP_FLOW_TEMPLATE');
 
-    const analysisResult: HarAnalysisResult = {
+    // Fill all ProcessingMetrics fields, using dummy values if needed
+    const metrics: import('./types').ProcessingMetrics = {
+      totalRequests: parseStats.totalEntries,
+      significantRequests: scoredEntries.length,
+      processingTime: parseStats.processingTimeMs,
+      filteringTime: undefined,
+      scoringTime: undefined,
+      tokenDetectionTime: undefined,
+      codeGenerationTime: undefined,
+      correlationAnalysisTime: undefined,
+      averageScore: undefined,
+      resourceTypeDistribution: undefined,
+      detectedPatterns: undefined
+    };
+
+    const analysisResult: import('./types').HarAnalysisResult = {
       requests: optimizedFlow.optimizedRequests,
-      metrics: {
-        totalRequests: parseStats.totalEntries,
-        significantRequests: scoredEntries.length,
-        processingTime: parseStats.processingTimeMs
-      },
+      metrics,
       loliCode: codeGenResult.loliCode,
-      tokenExtractionResults: tokenExtractionResults,
-      matchedPatterns: flowContext.matchedPatterns,
+      detectedTokens: detectedTokens,
+      behavioralFlows: flowContext.matchedPatterns,
+      warnings: [],
       dependencyAnalysis: dependencyAnalysis,
       optimizedFlow: optimizedFlow,
       mfaAnalysis: mfaAnalysis,

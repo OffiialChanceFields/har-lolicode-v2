@@ -115,24 +115,26 @@ export interface OB2ConfigurationResult {
 
 // Analysis Result Types
 export interface ProcessingMetrics {
-  totalRequests: number;
-  significantRequests: number;
-  processingTime: number;
-  filteringTime: number;
-  scoringTime: number;
-  tokenDetectionTime: number;
-  codeGenerationTime: number;
-  correlationAnalysisTime: number;
-  averageScore: number;
-  resourceTypeDistribution: Map<AnalysisMode.ResourceType, number>;
-  detectedPatterns: string[];
+  totalRequests?: number;
+  significantRequests?: number;
+  processingTime?: number;
+  filteringTime?: number;
+  scoringTime?: number;
+  tokenDetectionTime?: number;
+  codeGenerationTime?: number;
+  correlationAnalysisTime?: number;
+  averageScore?: number;
+  resourceTypeDistribution?: Map<AnalysisMode.ResourceType, number>;
+  detectedPatterns?: string[];
 }
 
 export interface HarAnalysisResult {
   requests: HarEntry[];
   metrics: ProcessingMetrics;
   loliCode: string;
-  detectedTokens: Map<string, DetectedToken[]>;
-  behavioralFlows: MatchedPattern[];
-  warnings: string[];
+  detectedTokens?: Map<string, DetectedToken[]>;
+  behavioralFlows?: MatchedPattern[];
+  warnings?: string[];
+  // Allow backward compatibility with possible extra fields
+  [key: string]: any;
 }

@@ -1,5 +1,6 @@
 
-import { AnalysisMode, EndpointClassifierImpl } from '../config/AnalysisMode';
+import { AnalysisMode } from './AnalysisMode';
+import { EndpointClassifierImpl } from './EndpointClassifierImpl';
 import { HarEntry } from './types';
 
 // --- Enhanced Interfaces and Types ---
