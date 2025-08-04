@@ -41,7 +41,7 @@ export class TemporalCorrelationAnalyzer {
       if (visited.has(i)) continue;
 
       let current = i;
-      let chainStart = i;
+      const chainStart = i;
       let chainStrength = 1.0;
 
       // Follow the chain forward

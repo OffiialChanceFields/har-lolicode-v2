@@ -19,30 +19,36 @@ export interface RecoveryAction {
   // Additional parameters for the action
 }
 
+export interface Action {
+  // Define a more specific structure for actions
+  type: string;
+  payload?: Record<string, unknown>;
+}
+
 export interface RecoveryStrategy {
   retryStrategy?: RetryStrategy;
   recoveryAction: RecoveryAction;
-  cleanupActions?: any[]; // Replace 'any' with a more specific type
+  cleanupActions?: Action[];
 }
 
 export interface ErrorScenario {
   type: ErrorType;
   errorCode: number;
-  primaryFlow: any[]; // Replace 'any' with a more specific type
+  primaryFlow: Action[];
 }
 
 export interface ErrorHandlingBlock {
   blockType: 'TRY';
-  tryBlock: any[]; // Replace 'any' with a more specific type
+  tryBlock: Action[];
   catchBlocks: {
     condition: string;
     action: RecoveryAction;
     retryStrategy?: RetryStrategy;
   }[];
-  finallyBlock?: any[]; // Replace 'any' with a more specific type
+  finallyBlock?: Action[];
 }
 
 export interface BehavioralFlow {
   // Define the structure of a behavioral flow
-  steps: any[]; // Replace 'any' with a more specific type
+  steps: Action[];
 }

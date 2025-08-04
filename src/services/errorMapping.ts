@@ -1,64 +1,80 @@
-
+// src/services/errorMapping.ts
 import {
   HarProcessingError,
   HarParsingError,
   EmptyHarError,
   InvalidHarFormatError,
   NoRequestsFoundError,
-  NoRelevantRequestsError,
+  NoRelevantRequestsError
 } from './errors';
 
-export interface ErrorInfo {
+export interface ErrorDisplay {
   title: string;
   description: string;
 }
 
-export const errorMapping: Map<new () => Error, ErrorInfo> = new Map([
+const errorMap: Map<new (...args: unknown[]) => Error, ErrorDisplay> = new Map([
   [
     EmptyHarError,
     {
       title: 'Empty HAR File',
-      description: 'The uploaded HAR file is empty. Please select a valid file.',
-    },
+      description: 'The provided HAR file is empty. Please upload a valid file.'
+    }
   ],
   [
     InvalidHarFormatError,
     {
       title: 'Invalid HAR Format',
       description:
-        "The file doesn't appear to be a valid HAR file. Please check the file and try again.",
-    },
+        "The file is not a valid HAR file. Please check the format and try again."
+    }
   ],
   [
     NoRequestsFoundError,
     {
       title: 'No Requests Found',
       description:
-        'The HAR file is valid, but it contains no network requests to analyze.',
-    },
+        'The HAR file is valid, but it contains no network requests to analyze.'
+    }
   ],
   [
     NoRelevantRequestsError,
     {
       title: 'No Relevant Requests',
       description:
-        'No relevant requests were found for the selected analysis mode.',
-    },
+        'No relevant requests were found after filtering. Try adjusting the analysis mode.'
+    }
   ],
   [
     HarParsingError,
     {
       title: 'HAR Parsing Error',
       description:
-        'An unexpected error occurred while parsing the HAR file. Please ensure it is well-formed.',
-    },
+        'An unexpected error occurred while parsing the HAR file. It may be corrupted.'
+    }
   ],
   [
     HarProcessingError,
     {
-      title: 'Processing Error',
-      description:
-        'An unexpected error occurred during analysis. Please try again or check the file.',
-    },
-  ],
+      title: 'Analysis Failed',
+      description: 'An unexpected error occurred during the analysis.'
+    }
+  ]
 ]);
+
+export { errorMap as errorMapping };
+
+export function getErrorDisplay(
+  error: Error
+): ErrorDisplay {
+  for (const [errorClass, display] of errorMap.entries()) {
+    if (error instanceof errorClass) {
+      return display;
+    }
+  }
+
+  return {
+    title: 'An Unknown Error Occurred',
+    description: 'Please try again or check the console for more details.'
+  };
+}

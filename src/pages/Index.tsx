@@ -8,7 +8,7 @@ import { AsyncHarProcessor } from '@/services/AsyncHarProcessor';
 import { Button } from '@/components/ui/button';
 import { InfoModal } from '@/components/InfoModal';
 import { Link } from 'react-router-dom';
-import { AnalysisMode, AnalysisModeService } from '@/services/AnalysisMode';
+import { AnalysisMode } from '@/services/AnalysisMode';
 import { AnalysisModeSelector } from '@/components/AnalysisModeSelector';
 import { toast } from "sonner";
 import { errorMapping } from '@/services/errorMapping';
@@ -23,7 +23,7 @@ interface ProcessingState {
       requestsFound: number;
       tokensDetected: number;
       criticalPath: string[];
-      matchedPatterns: any[];
+      matchedPatterns: Record<string, unknown>[];
     };
   } | null;
   filename: string;
@@ -58,8 +58,7 @@ const Index = () => {
     };
 
     try {
-      const analysisModeService = new AnalysisModeService();
-      const config = analysisModeService.get(selectedMode);
+      const config = AnalysisModeService.getConfiguration(selectedMode);
       if (!config) {
         throw new Error(`Analysis mode ${selectedMode} not found`);
       }

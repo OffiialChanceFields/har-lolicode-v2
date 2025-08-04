@@ -42,7 +42,7 @@ export class AsyncHarProcessor {
       allEntries.push(...batch);
     }
     const parseStats = parser.getStatistics();
-    
+
     if (allEntries.length === 0) {
       throw new Error(
         'The HAR file is valid, but it contains no network requests.'
@@ -72,22 +72,24 @@ export class AsyncHarProcessor {
       );
     }
 
-    // 2. Behavioral Analysis
+        // 2. Behavioral Analysis
     progressCallback?.(15, 'behavioral-analysis');
     const behavioralAnalyzer = new FlowAnalysisEngine(
       new AuthenticationPatternLibrary(),
       new EndpointClassifier()
     );
-    // Note: The previous behavioralAnalyzer was a simpler one. 
-    // This is now covered by the FlowAnalysisEngine.
-    // We'll extract matchedPatterns from flowContext after analysis.
+        
+    const flowContext = behavioralAnalyzer.analyzeFlowContext(
+      scoredEntries,
+      await parser.analyzeCorrelations(scoredEntries),
+      [] //TODO: populate real critical path indexes
+    );
 
     // 3. Dependency Analysis
     progressCallback?.(30, 'dependency-analysis');
     const dependencyAnalyzer = new RequestDependencyAnalyzer();
-    const correlationMatrix = await parser.analyzeCorrelations(scoredEntries);
-    const criticalPathIndices = (parser as any).criticalPath || [];
-    const dependencyAnalysis = dependencyAnalyzer.analyzeDependencies(scoredEntries);
+    const dependencyAnalysis =
+      dependencyAnalyzer.analyzeDependencies(scoredEntries);
 
     // 4. Request Optimization
     progressCallback?.(45, 'optimization');
@@ -116,8 +118,7 @@ export class AsyncHarProcessor {
     progressCallback?.(90, 'code-generation');
 
     const codeGenerator = new OB2SyntaxComplianceEngine();
-    // Pass the relevant parts of the analysis to the code generator
-    const codeGenResult = codeGenerator.generateCompliantLoliCode(behavioralAnalyzer.analyzeFlowContext(scoredEntries, correlationMatrix, criticalPathIndices));
+    const codeGenResult = codeGenerator.generateCompliantLoliCode(flowContext, 'MULTI_STEP_FLOW_TEMPLATE');
 
     const analysisResult: HarAnalysisResult = {
       requests: optimizedFlow.optimizedRequests,
@@ -128,11 +129,11 @@ export class AsyncHarProcessor {
       },
       loliCode: codeGenResult.loliCode,
       tokenExtractionResults: tokenExtractionResults,
-      matchedPatterns: behavioralAnalyzer.analyzeFlowContext(scoredEntries, correlationMatrix, criticalPathIndices).matchedPatterns, // Re-run or extract from flowContext
+      matchedPatterns: flowContext.matchedPatterns,
       dependencyAnalysis: dependencyAnalysis,
       optimizedFlow: optimizedFlow,
       mfaAnalysis: mfaAnalysis,
-      flowContext: behavioralAnalyzer.analyzeFlowContext(scoredEntries, correlationMatrix, criticalPathIndices)
+      flowContext: flowContext
     };
 
     progressCallback?.(100, 'complete');

@@ -9,7 +9,19 @@ export interface PatternMatch {
   patternId: string;
   confidence: number;
   steps: HarEntry[];
-  extractedData: Record<string, any>;
+  extractedData: Record<string, unknown>;
+}
+
+export interface PatternStep {
+    urlPattern?: RegExp;
+    methodPattern?: string[];
+    statusPattern?: number[];
+    headerPattern?: Record<string, RegExp>;
+    bodyPattern?: RegExp;
+    timing?: {
+        minDelaySeconds?: number;
+        maxDelaySeconds?: number;
+    };
 }
 
 export class BehavioralPatternMatcher {
@@ -70,7 +82,7 @@ export class BehavioralPatternMatcher {
 
           // Check timing constraints
           if (
-            pattern.pattern[patternIndex - 1].timing &&
+            (pattern.pattern[patternIndex - 1] as PatternStep).timing &&
             sequence.length > 1
           ) {
             const prevTime = new Date(
@@ -81,7 +93,7 @@ export class BehavioralPatternMatcher {
             ).getTime();
             const delaySeconds = (currTime - prevTime) / 1000;
 
-            const timing = pattern.pattern[patternIndex - 1].timing;
+            const timing = (pattern.pattern[patternIndex - 1] as PatternStep).timing;
             if (
               timing.minDelaySeconds &&
               delaySeconds < timing.minDelaySeconds
@@ -108,7 +120,7 @@ export class BehavioralPatternMatcher {
     return matches;
   }
 
-  private entryMatchesPattern(entry: HarEntry, pattern: any): boolean {
+  private entryMatchesPattern(entry: HarEntry, pattern: PatternStep): boolean {
     if (pattern.urlPattern && !pattern.urlPattern.test(entry.request.url)) {
       return false;
     }
@@ -181,7 +193,7 @@ export class BehavioralPatternMatcher {
 
     // Boost confidence if all expected tokens are present
     const hasExpectedTokens = entries.some(
-      (e) => (e as any).detectedTokens && (e as any).detectedTokens.length > 0
+      (e) => (e as HarEntry & { detectedTokens: DetectedToken[] }).detectedTokens && (e as HarEntry & { detectedTokens: DetectedToken[] }).detectedTokens.length > 0
     );
 
     if (hasExpectedTokens) {

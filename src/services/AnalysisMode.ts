@@ -1,195 +1,96 @@
+// src/services/AnalysisMode.ts
+import { HarRequest, HarEntry } from '../types';
 
 export namespace AnalysisMode {
+  // Predefined configuration profiles
   export enum Predefined {
-    ASSISTED = 'assisted',
     AUTOMATIC = 'automatic',
-    CUSTOM = 'custom',
-    MANUAL = 'manual'
+    MANUAL = 'manual',
+    ASSISTED = 'assisted'
   }
 
+  // Resource types for classification
   export enum ResourceType {
-    API_ENDPOINT = 'api_endpoint',
     AUTHENTICATION = 'authentication',
+    API_ENDPOINT = 'api_endpoint',
     FORM_SUBMISSION = 'form_submission',
+    GRAPHQL = 'graphql',
+    REST_API = 'rest_api',
     HTML_DOCUMENT = 'html_document',
+    FILE_UPLOAD = 'file_upload',
+    WEBSOCKET = 'websocket',
+    THIRD_PARTY = 'third_party',
+    TRACKING = 'tracking',
     STATIC_ASSET = 'static_asset',
-    THIRD_PARTY = 'third_party'
+    SESSION_MANAGEMENT = 'session_management'
   }
 
+  // Token detection scopes
   export enum TokenDetectionScope {
-    COMPREHENSIVE_SCAN = 'comprehensive_scan',
-    TARGETED_ANALYSIS = 'targeted_analysis'
+    COMPREHENSIVE_SCAN = 'comprehensive',
+    SESSION_MANAGEMENT_FOCUSED = 'session_focused',
+    USER_CONFIGURED = 'user_configured',
+    MINIMAL = 'minimal'
   }
 
+  // Code template types
   export enum CodeTemplateType {
-    MULTI_STEP_FLOW_TEMPLATE = 'multi_step_flow_template',
-    SINGLE_REQUEST_TEMPLATE = 'single_request_template'
+    SINGLE_REQUEST_TEMPLATE = 'single_request',
+    AUTHENTICATION_FAILURE_TEMPLATE = 'auth_failure',
+    AUTHENTICATION_SUCCESS_TEMPLATE = 'auth_success',
+    MULTI_STEP_FLOW_TEMPLATE = 'multi_step_flow',
+    GENERIC_TEMPLATE = 'generic'
   }
 
-  export interface WeightPattern {
-    pattern: RegExp;
-    weight: number;
+  // Parameter types for endpoint analysis
+  export enum ParameterType {
+    JWT = 'jwt',
+    API_KEY = 'api_key',
+    OAUTH_STATE = 'oauth_state',
+    SESSION_ID = 'session_id',
+    USERNAME = 'username',
+    PASSWORD = 'password',
+    EMAIL = 'email',
+    BOOLEAN = 'boolean',
+    NUMBER = 'number',
+    STRING = 'string'
   }
 
-  export interface FilteringOptions {
-    endpointPatterns?: {
-      include?: RegExp[];
-      exclude?: RegExp[];
-      priorityPatterns?: WeightPattern[];
+  // Endpoint characteristics
+  export interface EndpointCharacteristics {
+    hasAuthentication: boolean;
+    hasStateChange: boolean;
+    hasDataSubmission: boolean;
+    hasSensitiveData: boolean;
+    isIdempotent: boolean;
+    httpMethods: string[];
+    parameterTypes: ParameterType[];
+  }
+
+  // Filtering configuration
+  export interface FilteringConfig {
+    endpointPatterns: {
+      include: RegExp[];
+      exclude: RegExp[];
+      priorityPatterns: {
+        pattern: RegExp;
+        weight: number;
+      }[];
     };
-    resourceTypeWeights?: Map<ResourceType, number>;
+    resourceTypeWeights: Map<ResourceType, number>;
+    contextualRules: ContextualFilterRule[];
+    behavioralPatterns: BehavioralPattern[];
+    scoreThresholds: {
+      minimum: number;
+      optimal: number;
+      includeThreshold: number;
+    };
   }
 
-  export interface TokenDetectionOptions {
+  // Token detection configuration
+  export interface TokenDetectionConfig {
     scope: TokenDetectionScope;
     customPatterns?: RegExp[];
   }
 
-  export interface CodeGenerationOptions {
-    template: CodeTemplateType;
-    includeComments: boolean;
-  }
-
-  export interface AnalysisConfig {
-    mode: Predefined | string;
-    filtering: FilteringOptions;
-    tokenDetection: TokenDetectionOptions;
-    codeGeneration: CodeGenerationOptions;
-  }
-}
-
-export class AnalysisModeService {
-  private modes: Map<string, AnalysisMode.AnalysisConfig> = new Map();
-
-  constructor() {
-    this.registerDefaultModes();
-  }
-
-  private registerDefaultModes(): void {
-    // Manual mode - minimal automation
-    this.register(AnalysisMode.Predefined.MANUAL, {
-      mode: AnalysisMode.Predefined.MANUAL,
-      filtering: {},
-      tokenDetection: {
-        scope: AnalysisMode.TokenDetectionScope.TARGETED_ANALYSIS
-      },
-      codeGeneration: {
-        template: AnalysisMode.CodeTemplateType.SINGLE_REQUEST_TEMPLATE,
-        includeComments: false
-      }
-    });
-
-    // Automatic mode - aggressive automation
-    this.register(AnalysisMode.Predefined.AUTOMATIC, {
-      mode: AnalysisMode.Predefined.AUTOMATIC,
-      filtering: {
-        endpointPatterns: {
-          include: [/.*/], // Include everything by default
-          exclude: [
-            /\.(css|js|png|jpg|gif|svg|ico|woff2?)$/i,
-            /google-analytics\.com/,
-            /doubleclick\.net/
-          ],
-          priorityPatterns: [
-            { pattern: /login|auth|signin|token|oauth/i, weight: 1.0 },
-            { pattern: /api/i, weight: 0.8 }
-          ]
-        },
-        resourceTypeWeights: new Map([
-          [AnalysisMode.ResourceType.AUTHENTICATION, 1.0],
-          [AnalysisMode.ResourceType.API_ENDPOINT, 0.8],
-          [AnalysisMode.ResourceType.FORM_SUBMISSION, 0.9],
-          [AnalysisMode.ResourceType.HTML_DOCUMENT, 0.4],
-          [AnalysisMode.ResourceType.STATIC_ASSET, 0.1],
-          [AnalysisMode.ResourceType.THIRD_PARTY, 0.2]
-        ])
-      },
-      tokenDetection: {
-        scope: AnalysisMode.TokenDetectionScope.COMPREHENSIVE_SCAN,
-        customPatterns: [
-          /csrf[_-]?token/i,
-          /x[_-]?csrf[_-]?token/i,
-          /authenticity[_-]?token/i,
-          /session[_-]?id/i,
-          /jwt/i,
-          /bearer\s+[\w-]+\.[\w-]+\.[\w-]+/i // JWT pattern
-        ]
-      },
-      codeGeneration: {
-        template: AnalysisMode.CodeTemplateType.MULTI_STEP_FLOW_TEMPLATE,
-        includeComments: true
-      }
-    });
-
-    // Assisted mode - balanced approach
-    this.register(AnalysisMode.Predefined.ASSISTED, {
-      mode: AnalysisMode.Predefined.ASSISTED,
-      filtering: {
-        endpointPatterns: {
-          include: [
-            /\/(api|v\d+)\//,
-            /\/(auth|login|signin)/i,
-            /\.(json|xml)$/i
-          ],
-          exclude: [
-            /\.(css|js|png|jpg|gif|ico|woff2?)$/i,
-            /\/(tracking|analytics)/i
-          ],
-          priorityPatterns: [
-            { pattern: /\/login/i, weight: 0.9 },
-            { pattern: /\/api\//i, weight: 0.8 }
-          ]
-        },
-        resourceTypeWeights: new Map([
-          [AnalysisMode.ResourceType.AUTHENTICATION, 0.9],
-          [AnalysisMode.ResourceType.API_ENDPOINT, 0.8],
-          [AnalysisMode.ResourceType.FORM_SUBMISSION, 0.7],
-          [AnalysisMode.ResourceType.HTML_DOCUMENT, 0.5],
-          [AnalysisMode.ResourceType.STATIC_ASSET, 0.2],
-          [AnalysisMode.ResourceType.THIRD_PARTY, 0.3]
-        ])
-      },
-      tokenDetection: {
-        scope: AnalysisMode.TokenDetectionScope.COMPREHENSIVE_SCAN
-      },
-      codeGeneration: {
-        template: AnalysisMode.CodeTemplateType.MULTI_STEP_FLOW_TEMPLATE,
-        includeComments: true
-      }
-    });
-  }
-
-  register(name: string, config: AnalysisMode.AnalysisConfig): void {
-    if (this.modes.has(name)) {
-      console.warn(`Analysis mode "${name}" is being overridden.`);
-    }
-    this.modes.set(name, config);
-  }
-
-  get(name: string): AnalysisMode.AnalysisConfig | undefined {
-    return this.modes.get(name);
-  }
-
-  list(): string[] {
-    return Array.from(this.modes.keys());
-  }
-
-  createCustom(
-    baseModeName: string,
-    overrides: Partial<AnalysisMode.AnalysisConfig>
-  ): AnalysisMode.AnalysisConfig {
-    const baseConfig = this.get(baseModeName);
-    if (!baseConfig) {
-      throw new Error(`Base mode "${baseModeName}" not found.`);
-    }
-
-    // Deep merge would be better for a real implementation
-    const customConfig = {
-      ...baseConfig,
-      ...overrides,
-      mode: AnalysisMode.Predefined.CUSTOM
-    };
-
-    return customConfig;
-  }
-}
+  

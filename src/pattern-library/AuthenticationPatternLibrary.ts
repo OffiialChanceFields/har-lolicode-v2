@@ -24,7 +24,7 @@ export interface AuthenticationPattern {
   confidence: number;
   pattern: AuthenticationStep[];
   tokenPatterns: TokenPattern[];
-  extract?: (steps: HarEntry[]) => Record<string, any>;
+  extract?: (steps: HarEntry[]) => Record<string, unknown>;
 }
 
 export class AuthenticationPatternLibrary {

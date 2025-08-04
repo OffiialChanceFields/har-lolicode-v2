@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
-    "postinstall": "npm audit"
+    "postinstall": "npm audit",
+    "tsc": "tsc"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

@@ -1,7 +1,7 @@
 // src/core/StreamingHarParser.ts
-import { EventEmitter } from 'events';
+import { EventEmitter } from '../lib/event-emitter';
 import { CircularBuffer } from '../lib/CircularBuffer';
-import { HarEntry } from '../services/types';
+import { HarEntry, Har } from '../services/types';
 
 export interface ParserOptions {
   batchSize?: number;
@@ -56,7 +56,7 @@ export class StreamingHarParser extends EventEmitter {
   private statistics: ParseStatistics;
   private parseStartTime: number = 0;
   private correlationMatrix: number[][] | null = null;
-  private criticalPath: number[] | null = null;
+  public criticalPath: number[] | null = null;
   private abortController: AbortController;
 
   constructor(options: ParserOptions = {}) {
@@ -128,7 +128,7 @@ export class StreamingHarParser extends EventEmitter {
             );
           }
         } catch (error) {
-          this.handleEntryError(error, i, entries[i]);
+          this.handleEntryError(error as Error, i, entries[i]);
         }
       }
 
@@ -141,7 +141,7 @@ export class StreamingHarParser extends EventEmitter {
       this.finalizeStatistics();
       this.emit('end', this.statistics);
     } catch (error) {
-      this.emit('error', this.createParseError(error, 0, 'parsing'));
+      this.emit('error', this.createParseError(error as Error, 0, 'parsing'));
     }
   }
 
@@ -472,15 +472,15 @@ export class StreamingHarParser extends EventEmitter {
     return { ...this.statistics };
   }
 
-  private validateAndParseHar(harContent: string): any {
+  private validateAndParseHar(harContent: string): Har {
     if (!harContent || typeof harContent !== 'string') {
       throw new Error('HAR content must be a non-empty string');
     }
-    let har: any;
+    let har: Har;
     try {
       har = JSON.parse(harContent);
     } catch (error) {
-      throw new Error(`Invalid JSON in HAR file: ${error.message}`);
+      throw new Error(`Invalid JSON in HAR file: ${(error as Error).message}`);
     }
     // Validate HAR structure
     if (!har || typeof har !== 'object') {
@@ -531,7 +531,7 @@ export class StreamingHarParser extends EventEmitter {
           this.statistics.skippedEntries++;
         }
       } catch (error) {
-        this.handleEntryError(error, i, entries[i]);
+        this.handleEntryError(error as Error, i, entries[i]);
       }
       // Allow event loop to process other tasks
       if (i % 100 === 0) {
@@ -540,7 +540,7 @@ export class StreamingHarParser extends EventEmitter {
     }
   }
 
-  private processEntry(rawEntry: any, index: number): HarEntry | null {
+  private processEntry(rawEntry: Record<string, unknown>, index: number): HarEntry | null {
     try {
       // Validate entry structure
       if (!this.isValidEntry(rawEntry)) {
@@ -568,9 +568,9 @@ export class StreamingHarParser extends EventEmitter {
           entrySize) /
         this.statistics.totalEntries;
       // Process request
-      const request = this.processRequest(rawEntry.request);
+      const request = this.processRequest(rawEntry.request as Record<string, unknown>);
       // Process response
-      const response = this.processResponse(rawEntry.response);
+      const response = this.processResponse(rawEntry.response as Record<string, unknown>);
       // Check if we should skip large responses
       if (
         this.options.skipLargeResponses &&
@@ -580,55 +580,55 @@ export class StreamingHarParser extends EventEmitter {
       }
       // Create processed entry
       const entry: HarEntry = {
-        startedDateTime: rawEntry.startedDateTime,
-        time: rawEntry.time || 0,
+        startedDateTime: rawEntry.startedDateTime as string,
+        time: rawEntry.time as number || 0,
         request,
         response,
-        cache: this.options.includeCache ? rawEntry.cache : undefined,
-        timings: this.options.includeTiming ? rawEntry.timings : undefined,
-        serverIPAddress: rawEntry.serverIPAddress,
-        connection: rawEntry.connection,
-        comment: rawEntry.comment
+        cache: this.options.includeCache ? rawEntry.cache as Record<string, unknown> : undefined,
+        timings: this.options.includeTiming ? rawEntry.timings as Record<string, unknown> : undefined,
+        serverIPAddress: rawEntry.serverIPAddress as string,
+        connection: rawEntry.connection as string,
+        comment: rawEntry.comment as string
       };
       return entry;
     } catch (error) {
       throw new Error(
-        `Failed to process entry at index ${index}: ${error.message}`
+        `Failed to process entry at index ${index}: ${(error as Error).message}`
       );
     }
   }
 
-  private processRequest(rawRequest: any): any {
+  private processRequest(rawRequest: Record<string, unknown>): HarEntry['request'] {
     return {
-      method: rawRequest.method || 'GET',
-      url: rawRequest.url || '',
-      httpVersion: rawRequest.httpVersion || 'HTTP/1.1',
-      headers: this.processHeaders(rawRequest.headers),
-      queryString: rawRequest.queryString || [],
-      cookies: this.processCookies(rawRequest.cookies),
-      headersSize: rawRequest.headersSize || -1,
-      bodySize: rawRequest.bodySize || -1,
+      method: (rawRequest.method as string) || 'GET',
+      url: (rawRequest.url as string) || '',
+      httpVersion: (rawRequest.httpVersion as string) || 'HTTP/1.1',
+      headers: this.processHeaders(rawRequest.headers as Record<string, unknown>[]),
+      queryString: (rawRequest.queryString as Record<string, unknown>[]) || [],
+      cookies: this.processCookies(rawRequest.cookies as Record<string, unknown>[]),
+      headersSize: (rawRequest.headersSize as number) || -1,
+      bodySize: (rawRequest.bodySize as number) || -1,
       postData: rawRequest.postData
-        ? this.processPostData(rawRequest.postData)
+        ? this.processPostData(rawRequest.postData as Record<string, unknown>)
         : undefined
     };
   }
 
-  private processResponse(rawResponse: any): any {
+  private processResponse(rawResponse: Record<string, unknown>): HarEntry['response'] {
     return {
-      status: rawResponse.status || 0,
-      statusText: rawResponse.statusText || '',
-      httpVersion: rawResponse.httpVersion || 'HTTP/1.1',
-      headers: this.processHeaders(rawResponse.headers),
-      cookies: this.processCookies(rawResponse.cookies),
-      content: this.processContent(rawResponse.content),
-      redirectURL: rawResponse.redirectURL || '',
-      headersSize: rawResponse.headersSize || -1,
-      bodySize: rawResponse.bodySize || -1
+      status: (rawResponse.status as number) || 0,
+      statusText: (rawResponse.statusText as string) || '',
+      httpVersion: (rawResponse.httpVersion as string) || 'HTTP/1.1',
+      headers: this.processHeaders(rawResponse.headers as Record<string, unknown>[]),
+      cookies: this.processCookies(rawResponse.cookies as Record<string, unknown>[]),
+      content: this.processContent(rawResponse.content as Record<string, unknown>),
+      redirectURL: (rawResponse.redirectURL as string) || '',
+      headersSize: (rawResponse.headersSize as number) || -1,
+      bodySize: (rawResponse.bodySize as number) || -1
     };
   }
 
-  private processHeaders(rawHeaders: any[]): any[] {
+  private processHeaders(rawHeaders: Record<string, unknown>[]): { name: string, value: string }[] {
     if (!Array.isArray(rawHeaders)) return [];
     return rawHeaders
       .filter((h) => h && typeof h === 'object' && h.name && h.value !== undefined)
@@ -638,31 +638,31 @@ export class StreamingHarParser extends EventEmitter {
       }));
   }
 
-  private processCookies(rawCookies: any[]): any[] {
+  private processCookies(rawCookies: Record<string, unknown>[]): { name: string, value: string, path?: string, domain?: string, expires?: string, httpOnly?: boolean, secure?: boolean, sameSite?: string }[] {
     if (!Array.isArray(rawCookies)) return [];
     return rawCookies
       .filter((c) => c && typeof c === 'object' && c.name)
       .map((c) => ({
         name: String(c.name),
         value: String(c.value || ''),
-        path: c.path,
-        domain: c.domain,
-        expires: c.expires,
+        path: c.path as string,
+        domain: c.domain as string,
+        expires: c.expires as string,
         httpOnly: Boolean(c.httpOnly),
         secure: Boolean(c.secure),
-        sameSite: c.sameSite
+        sameSite: c.sameSite as string
       }));
   }
 
-  private processPostData(rawPostData: any): any {
+  private processPostData(rawPostData: Record<string, unknown>): HarEntry['request']['postData'] {
     return {
-      mimeType: rawPostData.mimeType || 'application/octet-stream',
-      text: rawPostData.text,
+      mimeType: (rawPostData.mimeType as string) || 'application/octet-stream',
+      text: rawPostData.text as string,
       params: Array.isArray(rawPostData.params) ? rawPostData.params : undefined
     };
   }
 
-  private processContent(rawContent: any): any {
+  private processContent(rawContent: Record<string, unknown>): HarEntry['response']['content'] {
     if (!rawContent || typeof rawContent !== 'object') {
       return {
         size: 0,
@@ -670,42 +670,42 @@ export class StreamingHarParser extends EventEmitter {
       };
     }
     return {
-      size: rawContent.size || 0,
-      compression: rawContent.compression,
-      mimeType: rawContent.mimeType || 'application/octet-stream',
-      text: rawContent.text,
-      encoding: rawContent.encoding
+      size: (rawContent.size as number) || 0,
+      compression: rawContent.compression as number,
+      mimeType: (rawContent.mimeType as string) || 'application/octet-stream',
+      text: rawContent.text as string,
+      encoding: rawContent.encoding as string
     };
   }
 
-  private isValidEntry(entry: any): boolean {
+  private isValidEntry(entry: Record<string, unknown>): boolean {
     if (!entry || typeof entry !== 'object') return false;
     if (!entry.request || typeof entry.request !== 'object') return false;
     if (!entry.response || typeof entry.response !== 'object') return false;
-    if (!entry.request.url || typeof entry.request.url !== 'string') return false;
+    if (!(entry.request as Record<string, unknown>).url || typeof (entry.request as Record<string, unknown>).url !== 'string') return false;
     if (!entry.startedDateTime) return false;
     if (this.options.validateEntries) {
       // Additional validation
-      if (!entry.request.method || typeof entry.request.method !== 'string')
+      if (!(entry.request as Record<string, unknown>).method || typeof (entry.request as Record<string, unknown>).method !== 'string')
         return false;
-      if (typeof entry.response.status !== 'number') return false;
-      if (!Array.isArray(entry.request.headers)) return false;
-      if (!Array.isArray(entry.response.headers)) return false;
+      if (typeof (entry.response as Record<string, unknown>).status !== 'number') return false;
+      if (!Array.isArray((entry.request as Record<string, unknown>).headers)) return false;
+      if (!Array.isArray((entry.response as Record<string, unknown>).headers)) return false;
     }
     return true;
   }
 
-  private handleEntryError(error: any, index: number, rawEntry: any): void {
+  private handleEntryError(error: Error, index: number, rawEntry: Record<string, unknown>): void {
     this.statistics.parseErrors++;
     const parseError: ParseError = {
       message: error.message || 'Unknown error',
       position: index,
       entry: rawEntry
         ? {
-            startedDateTime: rawEntry.startedDateTime,
+            startedDateTime: rawEntry.startedDateTime as string,
             request: {
-              url: rawEntry.request?.url,
-              method: rawEntry.request?.method
+              url: (rawEntry.request as Record<string, unknown>)?.url as string,
+              method: (rawEntry.request as Record<string, unknown>)?.method as string
             }
           }
         : undefined,
@@ -737,7 +737,7 @@ export class StreamingHarParser extends EventEmitter {
   }
 
   private createParseError(
-    error: any,
+    error: Error,
     position: number,
     phase: ParseError['phase']
   ): ParseError {
@@ -807,7 +807,7 @@ export class LargeFileHarParser extends StreamingHarParser {
               }
             }
           } catch (error) {
-            this.emit('warning', `Failed to parse entry: ${error.message}`);
+            this.emit('warning', `Failed to parse entry: ${(error as Error).message}`);
           }
           entryStart = -1;
         }
