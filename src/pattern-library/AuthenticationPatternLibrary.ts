@@ -81,13 +81,17 @@ export class AuthenticationPatternLibrary {
       confidence: 0.9,
       pattern: [
         {
-          urlPattern: /\/login/,
+          urlPattern: /\/(login|signin|auth|authenticate)/i,
           methodPattern: ['GET'],
+          statusPattern:,
+          timing: { minDelaySeconds: 0, maxDelaySeconds: 10 },
           required: true
         },
         {
-          urlPattern: /\/login/,
-          methodPattern: ['POST'],
+          urlPattern: /\/(login|signin|auth|authenticate|session|token)/i,
+          methodPattern: ['POST', 'PUT'],
+          statusPattern:,
+          timing: { minDelaySeconds: 0, maxDelaySeconds: 5 },
           required: true
         }
       ],

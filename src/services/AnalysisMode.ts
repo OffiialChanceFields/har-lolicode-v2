@@ -67,6 +67,23 @@ export namespace AnalysisMode {
     parameterTypes: ParameterType[];
   }
 
+// Behavioral pattern for stateful analysis
+  export interface BehavioralPattern {
+    id: string;
+    sequence: {
+      type: ResourceType,
+      characteristics: Partial<EndpointCharacteristics>
+    }[];
+    trigger: (requests: HarRequest[]) => boolean;
+  }
+
+  // Contextual rule for advanced filtering
+  export interface ContextualFilterRule {
+    id: string;
+    condition: (request: HarRequest, context: HarRequest[]) => boolean;
+    action: 'include' | 'exclude' | 'adjust_score';
+    scoreAdjustment?: number;
+  }
   // Filtering configuration
   export interface FilteringConfig {
     endpointPatterns: {
@@ -93,4 +110,79 @@ export namespace AnalysisMode {
     customPatterns?: RegExp[];
   }
 
+export interface AnalysisConfiguration {
+    filtering: FilteringConfig;
+    tokenDetection: TokenDetectionConfig;
+    // ... other configuration aspects
+  }
+
+  // --- AnalysisModeService ---
+  export class AnalysisModeService {
+    private static configurations: Map<Predefined, AnalysisConfiguration> = new Map();
+
+    static {
+      this.initializeConfigurations();
+    }
+
+    private static initializeConfigurations(): void {
+      // Default: Automatic Configuration
+      this.configurations.set(Predefined.AUTOMATIC, {
+        filtering: {
+            endpointPatterns: {
+                include: [/api/i, /auth/i],
+                exclude: [/\.css$/, /\.js$/, /\.svg$/, /\.png$/],
+                priorityPatterns: [
+                    { pattern: /login/i, weight: 10 },
+                    { pattern: /token/i, weight: 10 }
+                ]
+            },
+            resourceTypeWeights: new Map(),
+            contextualRules: [],
+            behavioralPatterns: [],
+            scoreThresholds: { minimum: 5, optimal: 20, includeThreshold: 10 }
+        },
+        tokenDetection: { scope: TokenDetectionScope.COMPREHENSIVE_SCAN }
+      });
+
+      // Manual Configuration
+      this.configurations.set(Predefined.MANUAL, {
+        filtering: {
+            endpointPatterns: {
+                include: [], // User-defined
+                exclude: [], // User-defined
+                priorityPatterns: [] // User-defined
+            },
+            resourceTypeWeights: new Map(),
+            contextualRules: [],
+            behavioralPatterns: [],
+            scoreThresholds: { minimum: 0, optimal: 0, includeThreshold: 0 } // User-defined
+        },
+        tokenDetection: { scope: TokenDetectionScope.USER_CONFIGURED }
+      });
+
+      // Assisted Configuration
+      this.configurations.set(Predefined.ASSISTED, {
+        filtering: {
+            endpointPatterns: {
+                include: [/api/i, /auth/i],
+                exclude: [/\.css$/, /\.js$/, /\.svg$/, /\.png$/],
+                priorityPatterns: [
+                    { pattern: /login/i, weight: 10 },
+                    { pattern: /token/i, weight: 10 }
+                ]
+            },
+            resourceTypeWeights: new Map(),
+            contextualRules: [],
+            behavioralPatterns: [],
+            scoreThresholds: { minimum: 3, optimal: 15, includeThreshold: 7 }
+        },
+        tokenDetection: { scope: TokenDetectionScope.SESSION_MANAGEMENT_FOCUSED }
+      });
+    }
+
+    public static getConfiguration(mode: Predefined): AnalysisConfiguration | undefined {
+      return this.configurations.get(mode);
+    }
+  }
+}
   

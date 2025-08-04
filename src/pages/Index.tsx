@@ -58,12 +58,22 @@ const Index = () => {
     };
 
     try {
-      const config = AnalysisModeService.getConfiguration(selectedMode);
+      const config = AnalysisMode.AnalysisModeService.getConfiguration(selectedMode);
       if (!config) {
         throw new Error(`Analysis mode ${selectedMode} not found`);
       }
       const result = await AsyncHarProcessor.processHarFileStreaming(content, config, progressCallback);
-      setProcessing(prev => ({ ...prev, result, isProcessing: false, progress: 100, currentStep: PIPELINE_STEPS.length }));
+      const { loliCode, metrics, detectedTokens, behavioralFlows } = result;
+      const processedResult = {
+        loliCode,
+        analysis: {
+          requestsFound: metrics.significantRequests,
+          tokensDetected: Array.from(detectedTokens.values()).flat().length,
+          criticalPath: [], // This needs to be derived differently now
+          matchedPatterns: behavioralFlows,
+        },
+      };
+      setProcessing(prev => ({ ...prev, result: processedResult, isProcessing: false, progress: 100, currentStep: PIPELINE_STEPS.length }));
     } catch (error: unknown) {
       console.error('Processing failed:', error);
             const errorType = error?.constructor as new () => Error;
@@ -122,7 +132,7 @@ const Index = () => {
           <div className="lg:col-span-2">
             {processing.result ? (
               <div className="space-y-6">
-                <CodeOutput loliCode={processing.result.loliCode} analysis={processing.result.analysis} filename={processing.filename} />
+                <CodeOutput analysisResult={processing.result} filename={processing.filename} />
                 <div className="flex justify-center"><Button onClick={resetProcessor} className="px-6 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg transition-glow">Process Another File</Button></div>
               </div>
             ) : (

@@ -18,7 +18,7 @@ import { HarEntry, HarAnalysisResult } from './types';
 export class AsyncHarProcessor {
   public static async processHarFileStreaming(
     harContent: string,
-    config: AnalysisMode.AnalysisConfig,
+    config: AnalysisMode.AnalysisConfiguration,
     progressCallback?: (progress: number, stage: string) => void
   ): Promise<HarAnalysisResult> {
     this.validateHarContent(harContent);
@@ -34,7 +34,10 @@ export class AsyncHarProcessor {
     });
 
     parser.on('error', (error) => {
-      throw new Error(`Failed to parse HAR file: ${error.message}`);
+      if (error instanceof Error) {
+        throw new Error(`Failed to parse HAR file: ${error.message}`);
+      }
+      throw new Error('An unknown error occurred during HAR parsing.');
     });
 
     // Use the new asynchronous parser
@@ -72,8 +75,22 @@ export class AsyncHarProcessor {
       );
     }
 
-        // 2. Behavioral Analysis
-    progressCallback?.(15, 'behavioral-analysis');
+        // 2. Dependency Analysis
+    progressCallback?.(15, 'dependency-analysis');
+    const dependencyAnalyzer = new RequestDependencyAnalyzer();
+    const dependencyAnalysis =
+      dependencyAnalyzer.analyzeDependencies(scoredEntries);
+
+    console.log('--- Dependency Analysis Output (Critical Path) ---');
+    console.log(JSON.stringify(dependencyAnalysis.criticalPath.map(e => ({url: e.request.url, method: e.request.method})), null, 2));
+
+    // Create indices from the critical path entries
+    const criticalPathIndices = dependencyAnalysis.criticalPath.map(entry =>
+      scoredEntries.findIndex(e => e.startedDateTime === entry.startedDateTime && e.request.url === entry.request.url)
+    ).filter(index => index !== -1);
+
+    // 3. Behavioral Analysis
+    progressCallback?.(30, 'behavioral-analysis');
     const behavioralAnalyzer = new FlowAnalysisEngine(
       new AuthenticationPatternLibrary(),
       new EndpointClassifier()
@@ -82,14 +99,11 @@ export class AsyncHarProcessor {
     const flowContext = behavioralAnalyzer.analyzeFlowContext(
       scoredEntries,
       await parser.analyzeCorrelations(scoredEntries),
-      [] //TODO: populate real critical path indexes
+      criticalPathIndices
     );
 
-    // 3. Dependency Analysis
-    progressCallback?.(30, 'dependency-analysis');
-    const dependencyAnalyzer = new RequestDependencyAnalyzer();
-    const dependencyAnalysis =
-      dependencyAnalyzer.analyzeDependencies(scoredEntries);
+    console.log('--- Flow Analysis Output (Flow Context) ---');
+    console.log(JSON.stringify(flowContext, null, 2));
 
     // 4. Request Optimization
     progressCallback?.(45, 'optimization');
@@ -125,15 +139,24 @@ export class AsyncHarProcessor {
       metrics: {
         totalRequests: parseStats.totalEntries,
         significantRequests: scoredEntries.length,
-        processingTime: parseStats.processingTimeMs
+        processingTime: parseStats.processingTimeMs,
+        filteringTime: 0, // Placeholder
+        scoringTime: 0, // Placeholder
+        tokenDetectionTime: 0, // Placeholder
+        codeGenerationTime: 0, // Placeholder
+        correlationAnalysisTime: 0, // Placeholder
+        averageScore: scoredEntries.reduce((acc, e) => acc + (e.score || 0), 0) / (scoredEntries.length || 1),
+        resourceTypeDistribution: new Map(), // Placeholder
+        detectedPatterns: flowContext.matchedPatterns.map(p => p.patternId),
       },
       loliCode: codeGenResult.loliCode,
-      tokenExtractionResults: tokenExtractionResults,
-      matchedPatterns: flowContext.matchedPatterns,
-      dependencyAnalysis: dependencyAnalysis,
-      optimizedFlow: optimizedFlow,
-      mfaAnalysis: mfaAnalysis,
-      flowContext: flowContext
+      detectedTokens: tokenExtractionResults.flatMap(r => r.tokens).reduce((m, t) => {
+        if (!m.has(t.name)) m.set(t.name, []);
+        m.get(t.name)!.push(t);
+        return m;
+      }, new Map()) as any,
+      behavioralFlows: flowContext.matchedPatterns,
+      warnings: [], // Placeholder
     };
 
     progressCallback?.(100, 'complete');
