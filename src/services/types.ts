@@ -61,41 +61,32 @@ export interface RequestParameter {
   isCredential?: boolean;
 }
 
+// TokenType and DetectedToken restored
+export enum TokenType {
+  Unknown = 'Unknown',
+  ApiKey = 'ApiKey',
+  Bearer = 'Bearer',
+  Basic = 'Basic',
+  Cookie = 'Cookie',
+  JWT = 'JWT',
+  OAuth = 'OAuth',
+  Session = 'Session',
+  Other = 'Other',
+}
+
+export interface DetectedToken {
+  type: TokenType;
+  value: string;
+  location: string;
+  name?: string;
+  confidence?: number;
+}
+
 export interface HarEntry {
   startedDateTime: string;
   time: number;
-  request: {
-    method: string;
-    url: string;
-    httpVersion: string;
-    headers: { name: string; value: string }[];
-    queryString: { name: string; value: string }[];
-    cookies: { name: string; value: string; path?: string; domain?: string; expires?: string; httpOnly?: boolean; secure?: boolean; sameSite?: string }[];
-    headersSize: number;
-    bodySize: number;
-    postData?: {
-      mimeType: string;
-      text?: string;
-      params?: { name: string; value: string }[];
-    };
-  };
-  response: {
-    status: number;
-    statusText: string;
-    httpVersion: string;
-    headers: { name: string; value: string }[];
-    cookies: { name: string; value: string; path?: string; domain?: string; expires?: string; httpOnly?: boolean; secure?: boolean; sameSite?: string }[];
-    content: {
-      size: number;
-      compression?: number;
-      mimeType: string;
-      text?: string;
-      encoding?: string;
-    };
-    redirectURL: string;
-    headersSize: number;
-    bodySize: number;
-  };
+  request: HarRequest;
+  response: HarResponse;
   cache?: Record<string, unknown>;
   timings?: Record<string, unknown>;
   serverIPAddress?: string;
