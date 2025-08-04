@@ -1,10 +1,11 @@
 // src/error-handling/types.ts
 
 /**
- * Defines the types of errors that can occur during HAR processing and analysis.
+ * Defines the types of errors that can occur in the application.
+ * This enum provides a clear and consistent way to identify errors.
  */
 export enum ErrorType {
-  // HAR File Errors
+  // HAR File Processing Errors
   EMPTY_HAR = 'EMPTY_HAR',
   INVALID_HAR_FORMAT = 'INVALID_HAR_FORMAT',
   HAR_PARSING_ERROR = 'HAR_PARSING_ERROR',
@@ -25,12 +26,4 @@ export enum ErrorType {
   // Token and Dependency Errors
   TOKEN_DETECTION_ERROR = 'TOKEN_DETECTION_ERROR',
   REQUEST_DEPENDENCY_ERROR = 'REQUEST_DEPENDENCY_ERROR',
-
-  // MFA and Optimization Errors
-  MFA_FLOW_ERROR = 'MFA_FLOW_ERROR',
-  REQUEST_OPTIMIZATION_ERROR = 'REQUEST_OPTIMIZATION_ERROR',
-
-  // General Application Errors
-  ANALYSIS_MODE_ERROR = 'ANALYSIS_MODE_ERROR',
-  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }

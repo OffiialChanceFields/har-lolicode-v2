@@ -1,59 +1,79 @@
+// src/hooks/useHarAnalysis.ts
 
-import { useState, useCallback } from 'react';
-import { AnalysisMode } from '../services/AnalysisMode';
-import { AsyncHarProcessor } from '../services/AsyncHarProcessor';
+import { useState } from 'react';
+import { Har } from '../types';
+import { AsyncHarProcessor } from '../core/AsyncHarProcessor';
+import { AppError } from '../error-handling/ErrorHandlingFramework';
 
-interface HarAnalysisResult {
-    loliCode: string;
-    analysis: {
-        requestsFound: number;
-        tokensDetected: number;
-        criticalPath: string[];
-    };
-}
-
-interface UseHarAnalysisReturn {
-  analyzeHar: (harContent: string, config: AnalysisMode.Configuration) => Promise<HarAnalysisResult | undefined>;
+// Defines the state of the HAR analysis process
+export interface HarAnalysisState {
+  har: Har | null;
   isLoading: boolean;
-  error: Error | null;
-  progress: {
-      value: number;
-      stage: string;
-  };
+  error: AppError | null;
+  progress: number;
+  status: string;
 }
 
-export const useHarAnalysis = (): UseHarAnalysisReturn => {
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [progress, setProgress] = useState({ value: 0, stage: '' });
+/**
+ * Custom hook to manage the HAR file analysis process.
+ * It handles the state of the analysis, including loading, errors, progress, and status.
+ *
+ * @returns The analysis state and a function to start the analysis.
+ */
+export const useHarAnalysis = (): [HarAnalysisState, (file: File) => void] => {
+  const [analysisState, setAnalysisState] = useState<HarAnalysisState>({
+    har: null,
+    isLoading: false,
+    error: null,
+    progress: 0,
+    status: 'Ready',
+  });
 
-  const analyzeHar = useCallback(async (harContent: string, config: AnalysisMode.Configuration) => {
-    setIsLoading(true);
-    setError(null);
-    setProgress({ value: 0, stage: 'starting' });
+  /**
+   * Starts the analysis of the provided HAR file.
+   * @param file The HAR file to analyze.
+   */
+  const analyzeHar = (file: File) => {
+    setAnalysisState({
+      har: null,
+      isLoading: true,
+      error: null,
+      progress: 0,
+      status: 'Initializing analysis...',
+    });
 
-    try {
-      const result = await AsyncHarProcessor.processHarFileStreaming(
-        harContent,
-        config,
-        (value, stage) => setProgress({ value, stage })
-      );
-      setIsLoading(false);
-      return result;
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        setError(e);
-      } else {
-        setError(new Error('An unknown error occurred during HAR analysis.'));
-      }
-      setIsLoading(false);
-    }
-  }, []);
+    const harProcessor = new AsyncHarProcessor(file);
 
-  return {
-    analyzeHar,
-    isLoading,
-    error,
-    progress
+    harProcessor.on('onProgress', (progress) => {
+      setAnalysisState((prevState) => ({ ...prevState, progress }));
+    });
+
+    harProcessor.on('onStatusUpdate', (status) => {
+      setAnalysisState((prevState) => ({ ...prevState, status }));
+    });
+
+    harProcessor.on('onError', (error) => {
+      setAnalysisState({
+        har: null,
+        isLoading: false,
+        error: error as AppError,
+        progress: 0,
+        status: 'Analysis failed',
+      });
+    });
+
+    harProcessor.on('onComplete', (har) => {
+      setAnalysisState({
+        har,
+        isLoading: false,
+        error: null,
+        progress: 100,
+        status: 'Analysis complete',
+      });
+    });
+
+    harProcessor.process();
   };
+
+  return [analysisState, analyzeHar];
 };
