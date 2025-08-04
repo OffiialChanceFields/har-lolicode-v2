@@ -1,54 +1,36 @@
+// src/error-handling/types.ts
+
+/**
+ * Defines the types of errors that can occur during HAR processing and analysis.
+ */
 export enum ErrorType {
-  RATE_LIMITING = 'rate_limiting',
-  AUTHENTICATION_FAILURE = 'auth_failure',
-  CAPTCHA_REQUIRED = 'captcha_required',
-  SERVER_ERROR = 'server_error',
-  NETWORK_TIMEOUT = 'network_timeout',
-  INVALID_TOKEN = 'invalid_token',
-  SESSION_EXPIRED = 'session_expired'
-}
+  // HAR File Errors
+  EMPTY_HAR = 'EMPTY_HAR',
+  INVALID_HAR_FORMAT = 'INVALID_HAR_FORMAT',
+  HAR_PARSING_ERROR = 'HAR_PARSING_ERROR',
+  NO_REQUESTS_FOUND = 'NO_REQUESTS_FOUND',
+  NO_RELEVANT_REQUESTS = 'NO_RELEVANT_REQUESTS',
 
-export interface RetryStrategy {
-  count: number;
-  delayMs: number;
-  backoffFactor?: number;
-}
+  // Flow Analysis Errors
+  STATE_TRANSITION_ERROR = 'STATE_TRANSITION_ERROR',
+  TEMPORAL_CORRELATION_ERROR = 'TEMPORAL_CORRELATION_ERROR',
+  BEHAVIORAL_PATTERN_ERROR = 'BEHAVIORAL_PATTERN_ERROR',
+  FLOW_VALIDATION_ERROR = 'FLOW_VALIDATION_ERROR',
 
-export interface RecoveryAction {
-  type: 'RETRY' | 'MARK_FAILURE' | 'CUSTOM_LOGIC';
-  // Additional parameters for the action
-}
+  // Syntax Compliance Errors
+  SYNTAX_VALIDATION_ERROR = 'SYNTAX_VALIDATION_ERROR',
+  BLOCK_OPTIMIZATION_ERROR = 'BLOCK_OPTIMIZATION_ERROR',
+  VARIABLE_LIFECYCLE_ERROR = 'VARIABLE_LIFECYCLE_ERROR',
 
-export interface Action {
-  // Define a more specific structure for actions
-  type: string;
-  payload?: Record<string, unknown>;
-}
+  // Token and Dependency Errors
+  TOKEN_DETECTION_ERROR = 'TOKEN_DETECTION_ERROR',
+  REQUEST_DEPENDENCY_ERROR = 'REQUEST_DEPENDENCY_ERROR',
 
-export interface RecoveryStrategy {
-  retryStrategy?: RetryStrategy;
-  recoveryAction: RecoveryAction;
-  cleanupActions?: Action[];
-}
+  // MFA and Optimization Errors
+  MFA_FLOW_ERROR = 'MFA_FLOW_ERROR',
+  REQUEST_OPTIMIZATION_ERROR = 'REQUEST_OPTIMIZATION_ERROR',
 
-export interface ErrorScenario {
-  type: ErrorType;
-  errorCode: number;
-  primaryFlow: Action[];
-}
-
-export interface ErrorHandlingBlock {
-  blockType: 'TRY';
-  tryBlock: Action[];
-  catchBlocks: {
-    condition: string;
-    action: RecoveryAction;
-    retryStrategy?: RetryStrategy;
-  }[];
-  finallyBlock?: Action[];
-}
-
-export interface BehavioralFlow {
-  // Define the structure of a behavioral flow
-  steps: Action[];
+  // General Application Errors
+  ANALYSIS_MODE_ERROR = 'ANALYSIS_MODE_ERROR',
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }
