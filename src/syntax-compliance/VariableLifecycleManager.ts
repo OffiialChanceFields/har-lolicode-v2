@@ -34,41 +34,46 @@ export class VariableLifecycleManager {
   private determineVariableType(block: OB2BlockDefinition): string {
     const selector = block.parameters.get('selector') || '';
     const attribute = block.parameters.get('attribute') || '';
-    
+    const variable = block.parameters.get('variable') || '';
+
+    // Credential heuristics
+    if (/^(user(name)?|email)$/i.test(variable)) return 'USERNAME';
+    if (/^(pass(word)?|pwd)$/i.test(variable)) return 'PASSWORD';
+
     // Check for common token types
     if (/name=['"]?_token['"]?/.test(selector)) {
       return 'CSRF_TOKEN';
     }
-    
+
     if (/name=['"]?sessionid['"]?/i.test(selector)) {
       return 'SESSION_ID';
     }
-    
+
     if (/name=['"]?access_token['"]?/i.test(selector)) {
       return 'ACCESS_TOKEN';
     }
-    
+
     if (/name=['"]?refresh_token['"]?/i.test(selector)) {
       return 'REFRESH_TOKEN';
     }
-    
+
     if (/name=['"]?state['"]?/i.test(selector)) {
       return 'OAUTH_STATE';
     }
-    
+
     if (/name=['"]?code['"]?/i.test(selector)) {
       return 'AUTHORIZATION_CODE';
     }
-    
+
     // Check attribute
     if (attribute === 'value') {
       return 'FORM_FIELD';
     }
-    
+
     if (attribute === 'src' || attribute === 'href') {
       return 'URL';
     }
-    
+
     return 'STRING';
   }
 }

@@ -98,6 +98,7 @@ export class StreamingHarParser extends EventEmitter {
       this.statistics.estimatedTotal = entries.length;
       let processedCount = 0;
       const batchBuffer: HarEntry[] = [];
+      const totalBytes = harContent.length;
 
       for (let i = 0; i < entries.length; i++) {
         if (this.abortController.signal.aborted) {
@@ -124,7 +125,8 @@ export class StreamingHarParser extends EventEmitter {
             this.emitProgress(
               processedCount,
               entries.length,
-              harContent.length
+              Math.floor((processedCount / entries.length) * totalBytes),
+              totalBytes
             );
           }
         } catch (error) {
@@ -520,7 +522,7 @@ export class StreamingHarParser extends EventEmitter {
       // Estimate progress
       processedBytes = Math.floor((i / entries.length) * totalBytes);
       if (i % 10 === 0) {
-        this.emitProgress(i, entries.length, processedBytes);
+        this.emitProgress(i, entries.length, processedBytes, totalBytes);
       }
       try {
         const processedEntry = this.processEntry(entries[i], i);
@@ -590,6 +592,17 @@ export class StreamingHarParser extends EventEmitter {
         connection: rawEntry.connection as string,
         comment: rawEntry.comment as string
       };
+
+      // Attach extracted parameters
+      // Lazy-load to avoid import cycle if services import parser
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { ParameterExtractionService } = require('../services/parameter/ParameterExtractionService');
+        entry.parameters = ParameterExtractionService.extract(entry);
+      } catch (err) {
+        entry.parameters = [];
+      }
+
       return entry;
     } catch (error) {
       throw new Error(
@@ -655,10 +668,57 @@ export class StreamingHarParser extends EventEmitter {
   }
 
   private processPostData(rawPostData: Record<string, unknown>): HarEntry['request']['postData'] {
+    const mimeType = (rawPostData.mimeType as string) || 'application/octet-stream';
+    const text = rawPostData.text as string | undefined;
+    let params = Array.isArray(rawPostData.params) ? rawPostData.params : undefined;
+
+    // x-www-form-urlencoded: build params from text if missing/empty
+    if (
+      mimeType.includes('application/x-www-form-urlencoded') &&
+      (!params || params.length === 0) &&
+      text
+    ) {
+      try {
+        const searchParams = new URLSearchParams(text);
+        params = [];
+        searchParams.forEach((value, name) => {
+          params!.push({ name, value });
+        });
+      } catch {}
+    }
+
+    // application/json: flatten and build params if missing/empty
+    if (
+      mimeType.includes('application/json') &&
+      (!params || params.length === 0) &&
+      text
+    ) {
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed && typeof parsed === 'object') {
+          // Flatten 1-level deep, stringifying non-primitives
+          const flatten = (obj: any, prefix = ''): Record<string, string> => {
+            const result: Record<string, string> = {};
+            for (const [key, value] of Object.entries(obj)) {
+              const flatKey = prefix ? `${prefix}.${key}` : key;
+              if (typeof value === 'object' && value !== null) {
+                result[flatKey] = JSON.stringify(value);
+              } else {
+                result[flatKey] = String(value);
+              }
+            }
+            return result;
+          };
+          const flat = flatten(parsed);
+          params = Object.entries(flat).map(([name, value]) => ({ name, value }));
+        }
+      } catch {}
+    }
+
     return {
-      mimeType: (rawPostData.mimeType as string) || 'application/octet-stream',
-      text: rawPostData.text as string,
-      params: Array.isArray(rawPostData.params) ? rawPostData.params : undefined
+      mimeType,
+      text,
+      params
     };
   }
 
@@ -717,11 +777,12 @@ export class StreamingHarParser extends EventEmitter {
   private emitProgress(
     current: number,
     total: number,
-    bytesProcessed: number
+    bytesProcessed: number,
+    totalBytes: number
   ): void {
     const progress: ParseProgress = {
       bytesProcessed,
-      totalBytes: bytesProcessed, // Approximate
+      totalBytes,
       entriesParsed: this.statistics.validEntries,
       entriesSkipped: this.statistics.skippedEntries,
       currentBatch: Math.floor(current / this.options.batchSize),

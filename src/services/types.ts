@@ -54,23 +54,13 @@ export interface HarResponse {
   bodySize: number;
 }
 
-export interface HarEntry {
-  startedDateTime: string;
-  time: number;
-  request: HarRequest;
-  response: HarResponse;
-  cache?: Record<string, unknown>;
-  timings?: Record<string, unknown>;
-  serverIPAddress?: string;
-  connection?: string;
-  comment?: string;
-  // Custom properties for analysis
-  resourceTypes?: AnalysisMode.ResourceType[];
-  score?: number;
-  detectedTokens?: DetectedToken[];
+export interface RequestParameter {
+  name: string;
+  value: string;
+  location: 'query' | 'body' | 'header';
+  isCredential?: boolean;
 }
 
-// Token-related Types
 export enum TokenType {
   CSRF_TOKEN = 'csrf_token',
   SESSION_TOKEN = 'session_token',
@@ -99,6 +89,19 @@ export interface DetectedToken {
   type: TokenType;
   source: 'header' | 'body' | 'cookie' | 'url';
   confidence: number;
+}
+
+export interface HarEntry {
+  startedDateTime: string;
+  time: number;
+  request: HarRequest;
+  response: HarResponse;
+  cache?: Record<string, unknown>;
+  timings?: Record<string, unknown>;
+  serverIPAddress?: string;
+  connection?: string;
+  comment?: string;
+  parameters?: RequestParameter[];
 }
 
 // OB2 LoliCode Generation Types
