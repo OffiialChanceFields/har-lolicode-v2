@@ -1,17 +1,17 @@
 // src/syntax-compliance/BlockOptimizer.ts
-import { HarEntry, OB2BlockDefinition, BehavioralFlow } from '../types';
+import { HarEntry, OB2BlockDefinition } from '../services/types';
 import { PatternMatch } from '../flow-analysis/BehavioralPatternMatcher';
 
 export class BlockOptimizer {
   optimizeBlockSequence(
     requests: HarEntry[],
-    patternMatches: BehavioralFlow[],
+    patternMatches: PatternMatch[],
     templateType: string
   ): OB2BlockDefinition[] {
     const blocks: OB2BlockDefinition[] = [];
     
     // Determine the most relevant pattern
-    const primaryPattern = patternMatches.length > 0 ? patternMatches : null;
+    const primaryPattern = patternMatches.length > 0 ? patternMatches[0] : null;
     
     // Generate blocks based on template type
     switch (templateType) {

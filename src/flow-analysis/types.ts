@@ -24,3 +24,7 @@ export interface StateTransition {
   trigger: HarEntry;
   confidence: number;
 }
+
+// Re-export PatternMatch as MatchedPattern for wider use
+import { PatternMatch } from './BehavioralPatternMatcher';
+export type MatchedPattern = PatternMatch;
