@@ -13,7 +13,7 @@ import { RequestDependencyAnalyzer } from './dependency/RequestDependencyAnalyze
 import { RequestOptimizationEngine } from './optimization/RequestOptimizationEngine';
 import { MFAFlowAnalyzer } from './mfa/MFAFlowAnalyzer';
 
-import { HarEntry, HarAnalysisResult } from './types';
+import { HarEntry, HarAnalysisResult, DetectedToken } from './types';
 
 export class AsyncHarProcessor {
   public static async processHarFileStreaming(
@@ -145,7 +145,7 @@ export class AsyncHarProcessor {
         tokenDetectionTime: 0, // Placeholder
         codeGenerationTime: 0, // Placeholder
         correlationAnalysisTime: 0, // Placeholder
-        averageScore: scoredEntries.reduce((acc, e) => acc + (e.score || 0), 0) / (scoredEntries.length || 1),
+        averageScore: scoredEntries.reduce((acc, e) => acc + (e.finalScore || 0), 0) / (scoredEntries.length || 1),
         resourceTypeDistribution: new Map(), // Placeholder
         detectedPatterns: flowContext.matchedPatterns.map(p => p.patternId),
       },
@@ -154,7 +154,7 @@ export class AsyncHarProcessor {
         if (!m.has(t.name)) m.set(t.name, []);
         m.get(t.name)!.push(t);
         return m;
-      }, new Map()) as any,
+      }, new Map<string, DetectedToken[]>()),
       behavioralFlows: flowContext.matchedPatterns,
       warnings: [], // Placeholder
     };

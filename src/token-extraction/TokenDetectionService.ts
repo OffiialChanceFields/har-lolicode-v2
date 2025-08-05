@@ -438,7 +438,7 @@ class CrossReferenceAnalyzer {
     // For each group of tokens with the same value, determine the most appropriate type
     const results: DetectedToken[] = [];
 
-    tokensByValue.forEach((tokenGroup, value) => {
+    tokensByValue.forEach((tokenGroup) => {
       if (tokenGroup.length === 1) {
         results.push(tokenGroup[0]);
         return;
@@ -930,27 +930,29 @@ export class TokenDetectionService {
     return crossReferences;
   }
 
-  private flattenObject(obj: any, prefix = ''): Record<string, any> {
-    const flattened: Record<string, any> = {};
-    Object.entries(obj).forEach(([key, value]) => {
-      const newKey = prefix ? `${prefix}.${key}` : key;
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        Object.assign(flattened, this.flattenObject(value, newKey));
-      } else if (Array.isArray(value)) {
-        value.forEach((item, index) => {
-          if (typeof item === 'object') {
-            Object.assign(
-              flattened,
-              this.flattenObject(item, `${newKey}[${index}]`)
-            );
-          } else {
-            flattened[`${newKey}[${index}]`] = item;
-          }
-        });
-      } else {
-        flattened[newKey] = value;
-      }
-    });
+  private flattenObject(obj: unknown, prefix = ''): Record<string, unknown> {
+    const flattened: Record<string, unknown> = {};
+    if (obj && typeof obj === 'object') {
+      Object.entries(obj).forEach(([key, value]) => {
+        const newKey = prefix ? `${prefix}.${key}` : key;
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          Object.assign(flattened, this.flattenObject(value, newKey));
+        } else if (Array.isArray(value)) {
+          value.forEach((item, index) => {
+            if (typeof item === 'object') {
+              Object.assign(
+                flattened,
+                this.flattenObject(item, `${newKey}[${index}]`)
+              );
+            } else {
+              flattened[`${newKey}[${index}]`] = item;
+            }
+          });
+        } else {
+          flattened[newKey] = value;
+        }
+      });
+    }
     return flattened;
   }
 }

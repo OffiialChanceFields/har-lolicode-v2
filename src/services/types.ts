@@ -102,6 +102,7 @@ export interface HarEntry {
   connection?: string;
   comment?: string;
   parameters?: RequestParameter[];
+  finalScore?: number;
 }
 
 // OB2 LoliCode Generation Types
@@ -138,6 +139,4 @@ export interface HarAnalysisResult {
   detectedTokens?: Map<string, DetectedToken[]>;
   behavioralFlows?: MatchedPattern[];
   warnings?: string[];
-  // Allow backward compatibility with possible extra fields
-  [key: string]: any;
 }

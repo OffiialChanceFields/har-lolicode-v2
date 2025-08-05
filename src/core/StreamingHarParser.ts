@@ -2,6 +2,7 @@
 import { EventEmitter } from '../lib/event-emitter';
 import { CircularBuffer } from '../lib/CircularBuffer';
 import { HarEntry, Har } from '../services/types';
+import { ParameterExtractionService } from '../services/parameter/ParameterExtractionService';
 
 export interface ParserOptions {
   batchSize?: number;
@@ -572,7 +573,7 @@ export class StreamingHarParser extends EventEmitter {
       // Process request
       const request = this.processRequest(rawEntry.request as Record<string, unknown>);
       // Process response
-      const response = this.processResponse(rawEntry.response as Record<string, unknown>);
+      const response = this.processResponse(rawResponse.response as Record<string, unknown>);
       // Check if we should skip large responses
       if (
         this.options.skipLargeResponses &&
@@ -586,22 +587,15 @@ export class StreamingHarParser extends EventEmitter {
         time: rawEntry.time as number || 0,
         request,
         response,
-        cache: this.options.includeCache ? rawEntry.cache as Record<string, unknown> : undefined,
-        timings: this.options.includeTiming ? rawEntry.timings as Record<string, unknown> : undefined,
+        cache: this.options.includeCache ? rawEntry.cache as Record<string, unknown> : {},
+        timings: this.options.includeTiming ? rawEntry.timings as Record<string, unknown> : {},
         serverIPAddress: rawEntry.serverIPAddress as string,
         connection: rawEntry.connection as string,
         comment: rawEntry.comment as string
       };
 
       // Attach extracted parameters
-      // Lazy-load to avoid import cycle if services import parser
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { ParameterExtractionService } = require('../services/parameter/ParameterExtractionService');
-        entry.parameters = ParameterExtractionService.extract(entry);
-      } catch (err) {
-        entry.parameters = [];
-      }
+      entry.parameters = ParameterExtractionService.extract(entry);
 
       return entry;
     } catch (error) {
@@ -617,8 +611,8 @@ export class StreamingHarParser extends EventEmitter {
       url: (rawRequest.url as string) || '',
       httpVersion: (rawRequest.httpVersion as string) || 'HTTP/1.1',
       headers: this.processHeaders(rawRequest.headers as Record<string, unknown>[]),
-      queryString: (rawRequest.queryString as Record<string, unknown>[]) || [],
-      cookies: this.processCookies(rawRequest.cookies as Record<string, unknown>[]),
+      queryString: (rawRequest.queryString as { name: string, value: string }[]) || [],
+      cookies: this.processCookies(rawRequest.cookies as Record<string, unknown>[]) as HarCookie[],
       headersSize: (rawRequest.headersSize as number) || -1,
       bodySize: (rawRequest.bodySize as number) || -1,
       postData: rawRequest.postData
@@ -669,8 +663,8 @@ export class StreamingHarParser extends EventEmitter {
 
   private processPostData(rawPostData: Record<string, unknown>): HarEntry['request']['postData'] {
     const mimeType = (rawPostData.mimeType as string) || 'application/octet-stream';
-    const text = rawPostData.text as string | undefined;
-    let params = Array.isArray(rawPostData.params) ? rawPostData.params : undefined;
+    const text = rawPostData.text as string;
+    let params = Array.isArray(rawPostData.params) ? rawPostData.params as { name: string, value: string }[] : undefined;
 
     // x-www-form-urlencoded: build params from text if missing/empty
     if (
@@ -684,7 +678,9 @@ export class StreamingHarParser extends EventEmitter {
         searchParams.forEach((value, name) => {
           params!.push({ name, value });
         });
-      } catch {}
+      } catch (e) {
+        // ignore errors
+      }
     }
 
     // application/json: flatten and build params if missing/empty
@@ -697,7 +693,7 @@ export class StreamingHarParser extends EventEmitter {
         const parsed = JSON.parse(text);
         if (parsed && typeof parsed === 'object') {
           // Flatten 1-level deep, stringifying non-primitives
-          const flatten = (obj: any, prefix = ''): Record<string, string> => {
+          const flatten = (obj: Record<string, unknown>, prefix = ''): Record<string, string> => {
             const result: Record<string, string> = {};
             for (const [key, value] of Object.entries(obj)) {
               const flatKey = prefix ? `${prefix}.${key}` : key;
@@ -712,7 +708,9 @@ export class StreamingHarParser extends EventEmitter {
           const flat = flatten(parsed);
           params = Object.entries(flat).map(([name, value]) => ({ name, value }));
         }
-      } catch {}
+      } catch (e) {
+        // ignore errors
+      }
     }
 
     return {

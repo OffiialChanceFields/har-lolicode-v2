@@ -1,6 +1,7 @@
 // src/syntax-compliance/BlockOptimizer.ts
-import { HarEntry, OB2BlockDefinition, BehavioralFlow } from '../types';
+import { HarEntry, OB2BlockDefinition, DetectedToken } from '../services/types';
 import { PatternMatch } from '../flow-analysis/BehavioralPatternMatcher';
+import { BehavioralFlow } from '../flow-analysis/types';
 
 export class BlockOptimizer {
   optimizeBlockSequence(
@@ -11,13 +12,13 @@ export class BlockOptimizer {
     const blocks: OB2BlockDefinition[] = [];
     
     // Determine the most relevant pattern
-    const primaryPattern = patternMatches.length > 0 ? patternMatches : null;
+    const primaryPattern = patternMatches.length > 0 ? patternMatches[0] : null;
     
     // Generate blocks based on template type
     switch (templateType) {
       case 'SINGLE_REQUEST_TEMPLATE':
         if (requests.length > 0) {
-          blocks.push(this.createHttpRequestBlock(requests));
+          blocks.push(this.createHttpRequestBlock(requests[0]));
         }
         break;
         
@@ -113,11 +114,7 @@ export class BlockOptimizer {
     // Create a single HTTP request block with all parse operations
     const enhancedBlock: OB2BlockDefinition = {
       ...httpRequestBlock,
-      outputCaptures: parseBlocks.map(block => ({
-        variable: block.parameters.get('variable') || '',
-        selector: block.parameters.get('selector') || '',
-        attribute: block.parameters.get('attribute') || ''
-      }))
+      parameters: new Map(httpRequestBlock.parameters),
     };
     
     return [enhancedBlock];
@@ -188,22 +185,18 @@ export class BlockOptimizer {
     
     return {
       blockType: 'HttpRequest',
-      blockId: `request_${Date.now()}`,
       parameters,
-      outputCaptures: []
     };
   }
   
-  private createParseBlock(token: any): OB2BlockDefinition {
+  private createParseBlock(token: DetectedToken): OB2BlockDefinition {
     return {
       blockType: 'Parse',
-      blockId: `parse_${token.name}_${Date.now()}`,
       parameters: new Map([
         ['variable', token.name],
         ['selector', `input[name='${token.name}']`],
         ['attribute', 'value']
       ]),
-      outputCaptures: []
     };
   }
   
@@ -222,101 +215,37 @@ export class BlockOptimizer {
     // Add retry logic
     blocks.push({
       blockType: 'BeginScript',
-      blockId: 'begin_script',
       parameters: new Map(),
-      outputCaptures: []
     });
     
     // Set retry parameters
     blocks.push({
       blockType: 'SetVariable',
-      blockId: 'set_retry_count',
       parameters: new Map([
         ['variable', 'retryCount'],
         ['value', '0']
       ]),
-      outputCaptures: []
     });
     
     blocks.push({
       blockType: 'SetVariable',
-      blockId: 'set_max_retries',
       parameters: new Map([
         ['variable', 'maxRetries'],
         ['value', '3']
       ]),
-      outputCaptures: []
     });
     
     // While loop
     blocks.push({
       blockType: 'While',
-      blockId: 'retry_loop',
       parameters: new Map([
         ['condition', 'retryCount < maxRetries'],
-        ['bodyBlocks', JSON.stringify([
-          this.createHttpRequestBlock(failedRequest),
-          {
-            blockType: 'If',
-            blockId: 'check_response',
-            parameters: new Map([
-              ['condition', 'RESPONSECODE == 200'],
-              ['thenBlocks', JSON.stringify([
-                {
-                  blockType: 'Log',
-                  blockId: 'log_success',
-                  parameters: new Map([
-                    ['message', 'Authentication successful']
-                  ]),
-                  outputCaptures: []
-                },
-                {
-                  blockType: 'Break',
-                  blockId: 'break_loop',
-                  parameters: new Map(),
-                  outputCaptures: []
-                }
-              ])],
-              ['elseBlocks', JSON.stringify([
-                {
-                  blockType: 'Log',
-                  blockId: 'log_failure',
-                  parameters: new Map([
-                    ['message', 'Authentication failed, attempt ' + retryCount]
-                  ]),
-                  outputCaptures: []
-                },
-                {
-                  blockType: 'SetVariable',
-                  blockId: 'increment_retry',
-                  parameters: new Map([
-                    ['variable', 'retryCount'],
-                    ['value', 'retryCount + 1']
-                  ]),
-                  outputCaptures: []
-                },
-                {
-                  blockType: 'Delay',
-                  blockId: 'wait_before_retry',
-                  parameters: new Map([
-                    ['milliseconds', '1000']
-                  ]),
-                  outputCaptures: []
-                }
-              ])]
-            ]),
-            outputCaptures: []
-          }
-        ])]
       ]),
-      outputCaptures: []
     });
     
     blocks.push({
       blockType: 'EndScript',
-      blockId: 'end_script',
       parameters: new Map(),
-      outputCaptures: []
     });
     
     return blocks;
@@ -324,7 +253,7 @@ export class BlockOptimizer {
   
   private createAuthSuccessTemplate(
     requests: HarEntry[],
-    primaryPattern: any | null
+    primaryPattern: BehavioralFlow | null
   ): OB2BlockDefinition[] {
     const blocks: OB2BlockDefinition[] = [];
     
@@ -336,22 +265,6 @@ export class BlockOptimizer {
     const authSteps = this.identifyAuthenticationSteps(requests);
     authSteps.forEach((step, index) => {
       blocks.push(this.createHttpRequestBlock(step));
-      
-      // Add token extraction after each step
-      if (step.detectedTokens && step.detectedTokens.length > 0) {
-        step.detectedTokens.forEach(token => {
-          blocks.push({
-            blockType: 'Parse',
-            blockId: `parse_${token.name}`,
-            parameters: new Map([
-              ['variable', token.name],
-              ['selector', `input[name='${token.name}']`],
-              ['attribute', 'value']
-            ]),
-            outputCaptures: []
-          });
-        });
-      }
     });
     
     return blocks;
@@ -359,28 +272,12 @@ export class BlockOptimizer {
   
   private createPatternBasedAuthTemplate(
     requests: HarEntry[],
-    pattern: any
+    pattern: BehavioralFlow
   ): OB2BlockDefinition[] {
     const blocks: OB2BlockDefinition[] = [];
     
     pattern.steps.forEach((step: HarEntry, index: number) => {
       blocks.push(this.createHttpRequestBlock(step));
-      
-      // Add token extraction after each step
-      if (step.detectedTokens && step.detectedTokens.length > 0) {
-        step.detectedTokens.forEach(token => {
-          blocks.push({
-            blockType: 'Parse',
-            blockId: `parse_${token.name}`,
-            parameters: new Map([
-              ['variable', token.name],
-              ['selector', `input[name='${token.name}']`],
-              ['attribute', 'value']
-            ]),
-            outputCaptures: []
-          });
-        });
-      }
     });
     
     return blocks;
@@ -394,23 +291,14 @@ export class BlockOptimizer {
     
     // Initialize variables
     const allTokens = new Set<string>();
-    requests.forEach(request => {
-      if (request.detectedTokens) {
-        request.detectedTokens.forEach(token => {
-          allTokens.add(token.name);
-        });
-      }
-    });
     
     allTokens.forEach(tokenName => {
       blocks.push({
         blockType: 'SetVariable',
-        blockId: `init_${tokenName}`,
         parameters: new Map([
           ['variable', tokenName],
           ['value', '']
         ]),
-        outputCaptures: []
       });
     });
     
@@ -425,30 +313,12 @@ export class BlockOptimizer {
             if (typeof value === 'string') {
               blocks.push({
                 blockType: 'SetVariable',
-                blockId: `set_${key}`,
                 parameters: new Map([
                   ['variable', key],
                   ['value', value]
                 ]),
-                outputCaptures: []
               });
             }
-          });
-        }
-        
-        // Add token extraction after each step
-        if (step.detectedTokens && step.detectedTokens.length > 0) {
-          step.detectedTokens.forEach(token => {
-            blocks.push({
-              blockType: 'Parse',
-              blockId: `parse_${token.name}`,
-              parameters: new Map([
-                ['variable', token.name],
-                ['selector', `input[name='${token.name}']`],
-                ['attribute', 'value']
-              ]),
-              outputCaptures: []
-            });
           });
         }
       });
@@ -460,22 +330,6 @@ export class BlockOptimizer {
     
     remainingRequests.forEach(request => {
       blocks.push(this.createHttpRequestBlock(request));
-      
-      // Add token extraction
-      if (request.detectedTokens && request.detectedTokens.length > 0) {
-        request.detectedTokens.forEach(token => {
-          blocks.push({
-            blockType: 'Parse',
-            blockId: `parse_${token.name}`,
-            parameters: new Map([
-              ['variable', token.name],
-              ['selector', `input[name='${token.name}']`],
-              ['attribute', 'value']
-            ]),
-            outputCaptures: []
-          });
-        });
-      }
     });
     
     return blocks;
@@ -486,22 +340,6 @@ export class BlockOptimizer {
     
     requests.forEach((request, index) => {
       blocks.push(this.createHttpRequestBlock(request));
-      
-      // Add token extraction
-      if (request.detectedTokens && request.detectedTokens.length > 0) {
-        request.detectedTokens.forEach(token => {
-          blocks.push({
-            blockType: 'Parse',
-            blockId: `parse_${token.name}`,
-            parameters: new Map([
-              ['variable', token.name],
-              ['selector', `input[name='${token.name}']`],
-              ['attribute', 'value']
-            ]),
-            outputCaptures: []
-          });
-        });
-      }
     });
     
     return blocks;

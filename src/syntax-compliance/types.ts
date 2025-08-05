@@ -14,10 +14,10 @@ export enum OB2BlockType {
 export interface OB2BlockDefinition {
   blockType: OB2BlockType;
   blockId: string;
-  parameters: Map<string, any>;
-  outputCaptures: any[];
-  errorHandling: any;
-  conditionalLogic: any[];
+  parameters: Map<string, unknown>;
+  outputCaptures: unknown[];
+  errorHandling: unknown;
+  conditionalLogic: unknown[];
 }
 
 export interface OB2ConfigurationResult {

@@ -40,17 +40,19 @@ export class StateTransitionModeler {
     return transitions;
   }
   
-  private modelPatternTransitions(patternMatch: any): StateTransition[] {
+  private modelPatternTransitions(patternMatch: PatternMatch[]): StateTransition[] {
     const transitions: StateTransition[] = [];
-    const steps = patternMatch.steps;
     
-    for (let i = 0; i < steps.length - 1; i++) {
-      transitions.push({
-        from: this.getStateName(steps[i]),
-        to: this.getStateName(steps[i + 1]),
-        trigger: steps[i].request.url,
-        confidence: patternMatch.confidence
-      });
+    for (const match of patternMatch) {
+      const steps = match.steps;
+      for (let i = 0; i < steps.length - 1; i++) {
+        transitions.push({
+          from: this.getStateName(steps[i]),
+          to: this.getStateName(steps[i + 1]),
+          trigger: steps[i].request.url,
+          confidence: match.confidence
+        });
+      }
     }
     
     return transitions;

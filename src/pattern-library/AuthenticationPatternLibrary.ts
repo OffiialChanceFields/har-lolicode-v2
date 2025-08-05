@@ -44,7 +44,7 @@ export interface AuthenticationPattern {
   name: string;
   confidence: number;
   pattern: Array<Partial<RequestPattern>>;
-  extract?: (matches: HarEntry[]) => Record<string, any>;
+  extract?: (matches: HarEntry[]) => Record<string, unknown>;
   tokenPatterns?: Array<{
     name: string;
     pattern: RegExp;
@@ -256,7 +256,7 @@ export class AuthenticationPatternLibrary {
         {
           headerPattern: {
             'x-api-key': /.+/,
-            'authorization': /^Bearer\s+[A-Za-z0-9\._\-]+/
+            'authorization': /^Bearer\s+[A-Za-z0-9._-]+/
           },
           timing: FLEXIBLE_TIMING
         }
@@ -282,7 +282,7 @@ export class AuthenticationPatternLibrary {
       pattern: [
         {
           headerPattern: {
-            'authorization': /^Bearer\s+[A-Za-z0-9\._\-]+/
+            'authorization': /^Bearer\s+[A-Za-z0-9._-]+/
           },
           timing: FLEXIBLE_TIMING
         }
@@ -296,7 +296,7 @@ export class AuthenticationPatternLibrary {
         }
       }),
       tokenPatterns: [
-        { name: 'access_token', pattern: /Bearer\s+([A-Za-z0-9\._\-]+)/, location: 'header' }
+        { name: 'access_token', pattern: /Bearer\s+([A-Za-z0-9._-]+)/, location: 'header' }
       ]
     });
     

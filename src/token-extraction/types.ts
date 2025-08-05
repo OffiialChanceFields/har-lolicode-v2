@@ -19,7 +19,7 @@ export interface DetectedToken {
   confidence: number;
   meta: {
     extractionLayer: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
