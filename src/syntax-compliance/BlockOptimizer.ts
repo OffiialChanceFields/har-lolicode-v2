@@ -1,24 +1,46 @@
-import { PatternMatch } from "./PatternMatch";
-// Removed unused import: import { BehavioralFlow } from "./BehavioralFlow";
-import { Block, BlockType } from "./Block";
+import { HarEntry, OB2BlockDefinition } from '../services/types';
+import { PatternMatch } from '../flow-analysis/BehavioralPatternMatcher';
 
 export class BlockOptimizer {
-    static createAuthSuccessTemplate(patternMatch: PatternMatch | null): Block[] {
-        if (!patternMatch) {
+    optimizeBlockSequence(
+        requests: HarEntry[],
+        patternMatches: PatternMatch[],
+        templateType: string
+    ): OB2BlockDefinition[] {
+        const primaryPattern = patternMatches.length > 0 ? patternMatches[0] : null;
+
+        // Previously, logic was in optimizeBlocks. This preserves that intent:
+        if (primaryPattern) {
+            if (primaryPattern.type === "auth-success") {
+                return this.createAuthSuccessTemplate(requests, primaryPattern);
+            } else if (primaryPattern.type === "pattern-auth") {
+                return this.createPatternBasedAuthTemplate(requests, primaryPattern);
+            } else if (primaryPattern.type === "multi-step") {
+                return this.createMultiStepFlowTemplate(requests, patternMatches);
+            }
+        }
+        return [];
+    }
+
+    createAuthSuccessTemplate(
+        requests: HarEntry[],
+        primaryPattern: PatternMatch | null
+    ): OB2BlockDefinition[] {
+        if (!primaryPattern) {
             return [];
         }
-        // Build blocks based on PatternMatch details
+        // Preserved logic, mapped to OB2BlockDefinition
         return [
             {
-                type: BlockType.Auth,
+                type: 'Auth',
                 data: {
-                    result: patternMatch.result,
-                    authType: patternMatch.authType,
-                    details: patternMatch.details
+                    result: primaryPattern.result,
+                    authType: primaryPattern.authType,
+                    details: primaryPattern.details
                 }
             },
             {
-                type: BlockType.Success,
+                type: 'Success',
                 data: {
                     message: "Authentication succeeded"
                 }
@@ -26,19 +48,21 @@ export class BlockOptimizer {
         ];
     }
 
-    static createPatternBasedAuthTemplate(patternMatch: PatternMatch): Block[] {
-        // Generates blocks for pattern-based authentication using PatternMatch
+    createPatternBasedAuthTemplate(
+        requests: HarEntry[],
+        pattern: PatternMatch
+    ): OB2BlockDefinition[] {
         return [
             {
-                type: BlockType.Auth,
+                type: 'Auth',
                 data: {
-                    pattern: patternMatch.pattern,
-                    authType: patternMatch.authType,
-                    details: patternMatch.details
+                    pattern: pattern.pattern,
+                    authType: pattern.authType,
+                    details: pattern.details
                 }
             },
             {
-                type: BlockType.Success,
+                type: 'Success',
                 data: {
                     message: "Pattern-based authentication succeeded"
                 }
@@ -46,44 +70,26 @@ export class BlockOptimizer {
         ];
     }
 
-    static createMultiStepFlowTemplate(patternMatch: PatternMatch): Block[] {
-        // Generates blocks for multi-step flows using PatternMatch
+    createMultiStepFlowTemplate(
+        requests: HarEntry[],
+        patternMatches: PatternMatch[]
+    ): OB2BlockDefinition[] {
+        // Example logic: use descriptions from patternMatches
+        const steps = (patternMatches[0]?.stepDescriptions || []).map((desc, i) => ({
+            type: 'Step',
+            data: {
+                step: i + 1,
+                description: desc || `Step ${i + 1}`
+            }
+        }));
         return [
+            ...steps,
             {
-                type: BlockType.Step,
-                data: {
-                    step: 1,
-                    description: patternMatch.stepDescriptions?.[0] || "Step 1"
-                }
-            },
-            {
-                type: BlockType.Step,
-                data: {
-                    step: 2,
-                    description: patternMatch.stepDescriptions?.[1] || "Step 2"
-                }
-            },
-            {
-                type: BlockType.Success,
+                type: 'Success',
                 data: {
                     message: "Multi-step flow completed"
                 }
             }
         ];
-    }
-
-    static optimizeBlocks(blocks: Block[], patternMatch: PatternMatch | null): Block[] {
-        if (!patternMatch) return blocks;
-
-        // Example optimization logic using PatternMatch
-        if (patternMatch.type === "auth-success") {
-            return this.createAuthSuccessTemplate(patternMatch);
-        } else if (patternMatch.type === "pattern-auth") {
-            return this.createPatternBasedAuthTemplate(patternMatch);
-        } else if (patternMatch.type === "multi-step") {
-            return this.createMultiStepFlowTemplate(patternMatch);
-        }
-
-        return blocks;
     }
 }
