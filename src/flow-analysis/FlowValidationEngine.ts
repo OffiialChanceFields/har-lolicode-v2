@@ -1,5 +1,5 @@
 // src/flow-analysis/FlowValidationEngine.ts
-import { HarEntry } from '../types';
+import { HarEntry } from '../services/types';
 import { PatternMatch } from './BehavioralPatternMatcher';
 import { StateTransition } from './StateTransitionModeler';
 
@@ -13,7 +13,7 @@ export class FlowValidationEngine {
     
     // Check if we have a complete pattern match
     if (patternMatches.length > 0) {
-      const primaryMatch = patternMatches;
+      const primaryMatch = patternMatches[0];
       completeness = primaryMatch.confidence * 0.7;
     }
     
