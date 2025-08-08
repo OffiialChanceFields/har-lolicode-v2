@@ -2,6 +2,7 @@
 import { EventEmitter } from '../lib/event-emitter';
 import { CircularBuffer } from '../lib/CircularBuffer';
 import { HarEntry, Har } from '../services/types';
+import { ParameterExtractionService } from '../services/parameter/ParameterExtractionService';
 
 export interface ParserOptions {
   batchSize?: number;
@@ -594,14 +595,7 @@ export class StreamingHarParser extends EventEmitter {
       };
 
       // Attach extracted parameters
-      // Lazy-load to avoid import cycle if services import parser
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { ParameterExtractionService } = require('../services/parameter/ParameterExtractionService');
-        entry.parameters = ParameterExtractionService.extract(entry);
-      } catch (err) {
-        entry.parameters = [];
-      }
+      entry.parameters = ParameterExtractionService.extract(entry);
 
       return entry;
     } catch (error) {
@@ -684,7 +678,9 @@ export class StreamingHarParser extends EventEmitter {
         searchParams.forEach((value, name) => {
           params!.push({ name, value });
         });
-      } catch {}
+      } catch {
+        // ignore
+      }
     }
 
     // application/json: flatten and build params if missing/empty
@@ -697,7 +693,7 @@ export class StreamingHarParser extends EventEmitter {
         const parsed = JSON.parse(text);
         if (parsed && typeof parsed === 'object') {
           // Flatten 1-level deep, stringifying non-primitives
-          const flatten = (obj: any, prefix = ''): Record<string, string> => {
+          const flatten = (obj: Record<string, unknown>, prefix = ''): Record<string, string> => {
             const result: Record<string, string> = {};
             for (const [key, value] of Object.entries(obj)) {
               const flatKey = prefix ? `${prefix}.${key}` : key;
@@ -712,7 +708,9 @@ export class StreamingHarParser extends EventEmitter {
           const flat = flatten(parsed);
           params = Object.entries(flat).map(([name, value]) => ({ name, value }));
         }
-      } catch {}
+      } catch {
+        // ignore
+      }
     }
 
     return {

@@ -1,7 +1,6 @@
 // src/services/AnalysisMode.ts
 import { HarRequest, HarEntry } from '../types';
 
-export namespace AnalysisMode {
   // Predefined configuration profiles
   export enum Predefined {
     AUTOMATIC = 'automatic',
@@ -184,5 +183,4 @@ export interface AnalysisConfiguration {
       return this.configurations.get(mode);
     }
   }
-}
   

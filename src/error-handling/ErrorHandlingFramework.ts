@@ -8,9 +8,9 @@ import { ErrorType } from './types';
  */
 export class AppError extends Error {
   public readonly type: ErrorType;
-  public readonly details: any;
+  public readonly details: unknown;
 
-  constructor(type: ErrorType, message: string, details?: any) {
+  constructor(type: ErrorType, message: string, details?: unknown) {
     super(message);
     this.name = this.constructor.name;
     this.type = type;
@@ -51,7 +51,7 @@ export const errorMessages: { [key in ErrorType]: string } = {
  * @param type The type of the error.
  * @param details Optional additional details about the error.
  */
-export const throwError = (type: ErrorType, details?: any): never => {
+export const throwError = (type: ErrorType, details?: unknown): never => {
   const message = errorMessages[type] || 'An unexpected error occurred.';
   throw new AppError(type, message, details);
 };

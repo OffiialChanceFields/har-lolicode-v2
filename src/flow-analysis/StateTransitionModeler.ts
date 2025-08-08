@@ -18,7 +18,7 @@ export class StateTransitionModeler {
     
     // If we have a pattern match, use it to model state transitions
     if (patternMatches.length > 0) {
-      const primaryMatch = patternMatches;
+      const primaryMatch = patternMatches[0];
       return this.modelPatternTransitions(primaryMatch);
     }
     
@@ -40,7 +40,7 @@ export class StateTransitionModeler {
     return transitions;
   }
   
-  private modelPatternTransitions(patternMatch: any): StateTransition[] {
+  private modelPatternTransitions(patternMatch: PatternMatch): StateTransition[] {
     const transitions: StateTransition[] = [];
     const steps = patternMatch.steps;
     
